@@ -1,6 +1,8 @@
 // Monta il gioco dentro un elemento: basta questo per inserirlo in una pagina del sito.
 
 import { creaAudio } from "./audio.js";
+import { TEMPO_BOSS } from "./boss.js";
+import { DURATA_CINEMATICA, SUONI_CINEMATICA } from "./cinematica.js";
 import { creaEffetti } from "./effetti.js";
 import { creaRender } from "./render.js";
 import { ALTEZZA, IN, LARGHEZZA, TICK, creaPartita, passo, punteggio, risultato } from "./sim.js";
@@ -24,6 +26,7 @@ const MARKUP = `
       <div class="zucco-comandi" hidden>
         <p><b>Salta:</b> spazio, freccia su o tocco. Tieni premuto per saltare più in alto.</p>
         <p><b>Scivola:</b> freccia giù. In aria ti fa scendere prima.</p>
+        <p><b>Mazza:</b> nel finale, tasto X o freccia destra.</p>
         <p><b>Audio:</b> tasto M o la nota qui accanto. In cuffia si sente da dove arrivano le cose.</p>
         <p><b>Caramelle:</b> con 20 arriva la luna piena e per 6 secondi rompi tutto.</p>
       </div>
@@ -31,6 +34,7 @@ const MARKUP = `
   </div>
   <div class="zucco-tocco">
     <button class="zucco-scivola" type="button">Scivola</button>
+    <button class="zucco-mazza" type="button" hidden>Mazza</button>
     <button class="zucco-salta" type="button">Salta</button>
   </div>
 `;
@@ -72,8 +76,9 @@ const nuovoSeme = () => crypto.getRandomValues(new Uint32Array(1))[0];
 /**
  * `seme`: se il server apre la sessione di gioco, è lui a dare il seed.
  * `alTermine(risultato)`: riceve seed, input e punteggio da mandare al server.
+ * `alFotogramma(partita, stato)`: chiamata a ogni fotogramma, per chi vuole seguire la partita da fuori.
  */
-export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {} } = {}) {
+export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {}, alFotogramma = () => {} } = {}) {
   radice.classList.add("zucco");
   radice.innerHTML = MARKUP;
 
@@ -86,6 +91,9 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   const aiuto = trova("aiuto");
   const comandi = trova("comandi");
   const tastoSuono = trova("suono");
+  const tastoMazza = trova("mazza");
+  const barraTocco = trova("tocco");
+  const daSecondo = new URLSearchParams(location.search).has("boss") ? TEMPO_BOSS - 1 : 0;
 
   const movimentoRidotto = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const sprite = await caricaSprite(new URL("../", import.meta.url));
@@ -100,6 +108,9 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   let accumulo = 0;
   let ultimoFotogramma = performance.now();
   let fineAlle = 0;
+  let tempoFilm = 0;
+  let prossimoSuono = 0;
+  let risultatoInviato = false;
 
   function mostraPannello(testoBottone, testoEsito = "") {
     bottone.textContent = testoBottone;
@@ -112,10 +123,14 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   function inizia() {
     effetti.svuota();
     audio.avvia();
-    s = creaPartita(seme(), (e) => {
-      effetti.evento(e);
-      audio.evento(e);
-    });
+    s = creaPartita(
+      seme(),
+      (e) => {
+        effetti.evento(e);
+        audio.evento(e);
+      },
+      { daSecondo },
+    );
     coda = [];
     accumulo = 0;
     stato = "gioco";
@@ -146,18 +161,33 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
     audio.fine();
     fineAlle = performance.now();
     const punti = punteggio(s);
-    const nuovoRecord = punti > record;
+    const nuovoRecord = !s.prova && punti > record;
     if (nuovoRecord) {
       record = punti;
       salvaRecord(record);
     }
     const dolci = s.caramelle === 1 ? "1 caramella" : `${s.caramelle} caramelle`;
-    mostraPannello("Rigioca", `${nuovoRecord ? "Nuovo record! " : ""}Stage ${s.stage}: ${punti} punti, ${dolci}`);
+    const esitoPartita = s.vinta ? "Hai battuto il Padrone delle Mani!" : `Stage ${s.stage}:`;
+    mostraPannello("Rigioca", `${nuovoRecord ? "Nuovo record! " : ""}${esitoPartita} ${punti} punti, ${dolci}`);
+    if (!risultatoInviato) alTermine(risultato(s));
+    risultatoInviato = false;
+  }
+
+  function avviaCinematica() {
+    stato = "cinematica";
+    tempoFilm = 0;
+    prossimoSuono = 0;
+    effetti.svuota();
+    audio.cinematica();
     alTermine(risultato(s));
+    risultatoInviato = true;
+    tastoMazza.hidden = true;
+    barraTocco.classList.remove("con-mazza");
   }
 
   function azionePrincipale() {
-    if (stato === "pausa") riprendi();
+    if (stato === "cinematica" && tempoFilm > 0.6) termina();
+    else if (stato === "pausa") riprendi();
     else if (stato === "titolo") inizia();
     else if (stato === "fine" && performance.now() - fineAlle > ATTESA_RIGIOCA) inizia();
   }
@@ -179,6 +209,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
 
   const TASTI_SALTO = new Set(["Space", "ArrowUp", "KeyW"]);
   const TASTI_GIU = new Set(["ArrowDown", "KeyS"]);
+  const TASTI_MAZZA = new Set(["KeyX", "ArrowRight", "KeyD"]);
 
   function tastoGiu(e) {
     if (e.code === "Escape" || e.code === "KeyP") {
@@ -187,6 +218,11 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
       return;
     }
     if (e.code === "KeyM" && !e.repeat) return alternaSuono();
+    if (TASTI_MAZZA.has(e.code)) {
+      e.preventDefault();
+      if (!e.repeat) premi(IN.MAZZA);
+      return;
+    }
     const salto = TASTI_SALTO.has(e.code);
     if (!salto && !TASTI_GIU.has(e.code)) return;
     e.preventDefault();
@@ -216,6 +252,10 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   tenuto(schermo, IN.SALTO_GIU, IN.SALTO_SU);
   tenuto(trova("salta"), IN.SALTO_GIU, IN.SALTO_SU);
   tenuto(trova("scivola"), IN.SCIVOLA_GIU, IN.SCIVOLA_SU);
+  tastoMazza.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    premi(IN.MAZZA);
+  });
 
   let timerAiuto = 0;
   const mostraAiuto = (visibile) => {
@@ -259,15 +299,34 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
         accumulo -= TICK;
       }
       audio.aggiorna(s);
-      if (s.finita) termina();
+      const duello = s.boss?.fase === "duello";
+      if (duello === tastoMazza.hidden) {
+        tastoMazza.hidden = !duello;
+        barraTocco.classList.toggle("con-mazza", duello);
+      }
+      if (s.finita) {
+        if (s.vinta) avviaCinematica();
+        else termina();
+      }
+    } else if (stato === "cinematica") {
+      tempoFilm += dt;
+      while (prossimoSuono < SUONI_CINEMATICA.length && SUONI_CINEMATICA[prossimoSuono][0] <= tempoFilm) {
+        const tipo = SUONI_CINEMATICA[prossimoSuono++][1];
+        audio.evento({ tipo });
+        effetti.evento({ tipo, x: 164, y: 150 });
+      }
+      if (tempoFilm >= DURATA_CINEMATICA) termina();
     } else if (stato === "titolo") {
       s.distanza += 70 * dt;
       s.tick = Math.floor(ora / (1000 / 60));
     }
 
+    alFotogramma(s, stato);
     const dtScena = stato === "pausa" ? 0 : dt;
     effetti.aggiorna(dtScena, s);
-    render.disegna(s, { record, titolo: stato === "titolo", dt: dtScena });
+    if (stato === "cinematica") render.cinematica(tempoFilm);
+    else if (stato === "fine" && s.vinta) render.cinematica(DURATA_CINEMATICA);
+    else render.disegna(s, { record, titolo: stato === "titolo", dt: dtScena });
     requestAnimationFrame(fotogramma);
   }
 

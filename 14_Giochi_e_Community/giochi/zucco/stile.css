@@ -159,6 +159,16 @@ body {
   touch-action: none;
 }
 
+.zucco-tocco.con-mazza {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.zucco-mazza {
+  color: var(--zucco-testo) !important;
+  background: #8a1e36;
+  box-shadow: inset 3px 3px 0 #c8483f;
+}
+
 .zucco-salta {
   background: var(--zucco-arancio);
   box-shadow: inset -3px -3px 0 var(--zucco-arancio-scuro), inset 3px 3px 0 #ffd07a;
@@ -187,8 +197,13 @@ body {
     inset: auto 0 0;
     grid-template-columns: 110px 110px;
     justify-content: space-between;
+    gap: 10px;
     padding: 8px 16px;
     pointer-events: none;
+  }
+
+  .zucco-tocco.con-mazza {
+    grid-template-columns: 110px 110px 110px;
   }
 
   .zucco-tocco button {

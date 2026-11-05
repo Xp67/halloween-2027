@@ -12,6 +12,22 @@ import {
   punteggio,
   scatolaOstacolo,
 } from "./sim.js";
+import {
+  CORSIE,
+  LARGO_PIATTAFORMA,
+  PIATTAFORME,
+  PREAVVISO_LANCIO,
+  PRESAGIO,
+  VITE_BOSS,
+  X_ATTERRAGGIO,
+  X_BOSS,
+  X_LANCIO,
+  X_PIATTAFORMA,
+  forzaTerremoto,
+} from "./boss.js";
+import { creaCinematica } from "./cinematica.js";
+import { COLORE_BRAND } from "./costanti.js";
+import { LUNE_PER_PREMIO } from "./punti.js";
 import { conBordo, scurito } from "./sprite.js";
 
 const BAYER = [
@@ -55,7 +71,7 @@ const DURATA_PASSAGGIO = 6;
 const cupezza = (t) => Math.min(1, t / (6 * DURATA_STAGE));
 
 const BORDO_PERICOLO = "#ffe9b0";
-const OSTACOLI_CON_BORDO = ["lapide", "croce", "recinto", "mano", "pipistrello", "fantasma", "ragno"];
+const OSTACOLI_CON_BORDO = ["lapide", "croce", "recinto", "mano", "pipistrello", "fantasma", "ragno", "lancio_osso", "lancio_teschio", "lancio_zucca"];
 
 // Le mani nere sono solo grafica: non arrivano mai a toccare Zucco e la logica di gioco non le conosce.
 const PRIMO_STAGE_MANI = 5;
@@ -77,6 +93,11 @@ const PRIMO_STAGE_ORDA = 7;
 const DURATA_INGRESSO = 3;
 const VISTA_AVANTI = 44;
 const COLORE_ORDA = "#7a1a30";
+const MANI_DEL_BOSS = 18;
+const RITIRATA_MANI = 2.4;
+const FASI_SENZA_BOSS = ["arrivo", "frenata", "silenzio", "trema"];
+const FINESTRE = [[36, 72], [132, 72], [136, 24]];
+const LUCI_CASA = [...FINESTRE.map(([x, y]) => [x, y, 14, 18]), [80, 90, 22, 32]];
 const MOSTRI_PER_STAGE = 4;
 // `x`: da 0 (in fondo, contro il muro) a 1 (alle spalle di Zucco). La riga 0 è più lontana e più scura.
 const ORDA = [
@@ -114,8 +135,29 @@ const FONT = {
   3: [0x21, 0x41, 0x49, 0x4d, 0x33], 4: [0x18, 0x14, 0x12, 0x7f, 0x10], 5: [0x27, 0x45, 0x45, 0x45, 0x39],
   6: [0x3c, 0x4a, 0x49, 0x49, 0x31], 7: [0x41, 0x21, 0x11, 0x09, 0x07], 8: [0x36, 0x49, 0x49, 0x49, 0x36],
   9: [0x46, 0x49, 0x49, 0x29, 0x1e], "!": [0x00, 0x00, 0x5f, 0x00, 0x00], ".": [0x00, 0x60, 0x60, 0x00, 0x00],
-  ":": [0x00, 0x36, 0x36, 0x00, 0x00], "-": [0x08, 0x08, 0x08, 0x08, 0x08], " ": [0, 0, 0, 0, 0],
+  ":": [0x00, 0x36, 0x36, 0x00, 0x00], ",": [0x00, 0x50, 0x30, 0x00, 0x00], "-": [0x08, 0x08, 0x08, 0x08, 0x08], " ": [0, 0, 0, 0, 0],
 };
+
+function scriviSu(ctx, testo, x, y, { colore = "#fff", scala = 1, ombra = "#160f1e", centro = false, destra = false } = {}) {
+  const larghezza = testo.length * 6 * scala - scala;
+  let cx = centro ? x - larghezza / 2 : destra ? x - larghezza : x;
+  cx = Math.round(cx);
+  const glifo = (dx, dy, c) => {
+    ctx.fillStyle = c;
+    [...testo].forEach((ch, i) => {
+      (FONT[ch] ?? FONT[" "]).forEach((colonna, col) => {
+        for (let r = 0; r < 7; r++)
+          if (colonna & (1 << r)) ctx.fillRect(cx + (i * 6 + col) * scala + dx, y + r * scala + dy, scala, scala);
+      });
+    });
+  };
+  if (ombra) {
+    const scarto = Math.min(scala, 2);
+    glifo(scarto, scarto, ombra);
+    if (scala > 2) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) glifo(dx, dy, ombra);
+  }
+  glifo(0, 0, colore);
+}
 
 function creaTela(w, h) {
   const tela = document.createElement("canvas");
@@ -309,6 +351,60 @@ function telaOmbra() {
   return tela;
 }
 
+/** Un numero fra 0 e 1 che cambia dieci volte al secondo, diverso per ogni luce. */
+const guizzo = (t, i) => Math.abs(Math.sin(Math.floor(t * 10) * 12.9898 + i * 78.233));
+
+function telaCasa() {
+  const w = 180, h = 122, [tela, ctx] = creaTela(w, h), rng = casuale(13);
+  const muro = "#2a1c38", ombraMuro = "#1c1228", tetto = "#140c1e";
+  const rettangolo = (c, x, y, l, a) => {
+    ctx.fillStyle = c;
+    ctx.fillRect(x, y, l, a);
+  };
+  rettangolo(muro, 22, 44, 136, 78);
+  for (let y = 46; y < 120; y += 8) for (let x = 24 + ((y / 8) % 2) * 6; x < 156; x += 12) rettangolo(ombraMuro, x, y, 10, 1);
+  for (let i = 0; i < 40; i++) rettangolo(tetto, 90 - 78 + i * 2, 44 - i, 156 - i * 4, 1);
+  rettangolo(muro, 128, 12, 24, 40);
+  for (let i = 0; i < 18; i++) rettangolo(tetto, 124 + i, 12 - i, 32 - i * 2, 1);
+  for (const [x, y] of FINESTRE) {
+    rettangolo("#160f1e", x - 1, y - 1, 16, 20);
+    rettangolo("#ffcf5e", x, y, 14, 18);
+    rettangolo("#f59a2e", x + 6, y, 2, 18);
+    rettangolo("#f59a2e", x, y + 8, 14, 2);
+  }
+  rettangolo("#160f1e", 78, 88, 26, 34);
+  rettangolo("#f59a2e", 80, 90, 22, 32);
+  rettangolo("#ffcf5e", 84, 94, 14, 28);
+  for (let i = 0; i < 14; i++) rettangolo(rng() > 0.5 ? "#ff6fa8" : "#37d6c2", 26 + i * 10, 56 + (i % 2) * 2, 2, 2);
+
+  // Il cartello: legno, scritta e logo.
+  rettangolo("#160f1e", 34, 34, 112, 30);
+  rettangolo("#5a3a26", 36, 36, 108, 26);
+  rettangolo("#7a5a44", 36, 36, 108, 2);
+  scriviSu(ctx, "FESTA HALLOWEEN", 90, 39, { centro: true, colore: "#ffe45e" });
+  const riga = 51, parola = "GET", resto = "INVOLVED", totale = (parola.length + resto.length) * 6;
+  scriviSu(ctx, parola, 90 - totale / 2, riga, { colore: "#ffffff" });
+  scriviSu(ctx, resto, 90 - totale / 2 + parola.length * 6, riga, { colore: COLORE_BRAND });
+  return tela;
+}
+
+function telaCorpoBoss() {
+  const w = 130, h = 120, [tela, ctx] = creaTela(w, h);
+  const dentro = (x, y) => {
+    const k = y / h;
+    const largo = 18 + 44 * k + Math.sin(y / 5) * 3;
+    return Math.abs(x - w / 2) < largo;
+  };
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (!dentro(x, y)) continue;
+      const bordo = !dentro(x - 1, y) || !dentro(x + 1, y) || y === 0;
+      ctx.fillStyle = bordo ? "#8a1e36" : "#030104";
+      ctx.fillRect(x, y, 1, 1);
+    }
+  return tela;
+}
+
 function passaggioAtti(t) {
   let atto = 0;
   ATTI.forEach((a, i) => {
@@ -351,6 +447,12 @@ export function creaRender(canvas, sprite, effetti) {
   );
   let faseMani = 0;
   let faseOrda = 0;
+  let W = LARGHEZZA;
+  let H = ALTEZZA;
+  let moltiplicatoreVisto = 1;
+  let caloMoltiplicatore = 0;
+  const casa = telaCasa();
+  const corpoBoss = telaCorpoBoss();
 
   const rng = casuale(99);
   const stelle = Array.from({ length: 70 }, () => ({
@@ -366,31 +468,19 @@ export function creaRender(canvas, sprite, effetti) {
     lungo: 0.72 + rng() * 0.28,
   }));
   const mostri = ORDA.map((m) => ({ ...m, fase: rng() * 6, ritmo: 0.8 + rng() * 0.7 }));
+  // Le mille mani del boss: una corona di braccia tutto attorno, a parte il suolo.
+  const corona = Array.from({ length: MANI_DEL_BOSS }, (_, i) => ({
+    angolo: Math.PI * (0.92 + (1.16 * i) / (MANI_DEL_BOSS - 1)) + (rng() - 0.5) * 0.1,
+    lungo: 58 + rng() * 44,
+    fase: rng() * 6,
+    ritmo: 0.8 + rng() * 0.9,
+  }));
 
-  function scrivi(testo, x, y, { colore = "#fff", scala = 1, ombra = "#160f1e", centro = false, destra = false } = {}) {
-    const larghezza = testo.length * 6 * scala - scala;
-    let cx = centro ? x - larghezza / 2 : destra ? x - larghezza : x;
-    cx = Math.round(cx);
-    const glifo = (dx, dy, c) => {
-      ctx.fillStyle = c;
-      [...testo].forEach((ch, i) => {
-        (FONT[ch] ?? FONT[" "]).forEach((colonna, col) => {
-          for (let r = 0; r < 7; r++)
-            if (colonna & (1 << r)) ctx.fillRect(cx + (i * 6 + col) * scala + dx, y + r * scala + dy, scala, scala);
-        });
-      });
-    };
-    if (ombra) {
-      const scarto = Math.min(scala, 2);
-      glifo(scarto, scarto, ombra);
-      if (scala > 2) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) glifo(dx, dy, ombra);
-    }
-    glifo(0, 0, colore);
-  }
+  const scrivi = (testo, x, y, opzioni) => scriviSu(ctx, testo, x, y, opzioni);
 
   function ripeti(tela, periodo, offset, y) {
     const inizio = -Math.round(offset % periodo);
-    for (let x = inizio; x < LARGHEZZA; x += periodo) ctx.drawImage(tela, x, y);
+    for (let x = inizio; x < W; x += periodo) ctx.drawImage(tela, x, y);
   }
 
   function dissolvi(nome, { da, a, k }, disegna) {
@@ -402,7 +492,7 @@ export function creaRender(canvas, sprite, effetti) {
   }
 
   function cielo(s, passaggio) {
-    dissolvi("cielo", passaggio, (t) => ctx.drawImage(t, 0, 0));
+    dissolvi("cielo", passaggio, (t) => ctx.drawImage(t, 0, 0, W, t.height));
 
     const notte = Math.min(1, s.t / inizioAtto(ATTI[1]));
     const spente = 1 - cupezza(s.t) * 0.75;
@@ -487,7 +577,52 @@ export function creaRender(canvas, sprite, effetti) {
     }
   }
 
+  function creaTratti() {
+    const tratti = [];
+    const tratto = (x0, y0, x1, y1, r) => {
+      const passi = Math.ceil(Math.hypot(x1 - x0, y1 - y0));
+      for (let i = 0; i <= passi; i++) {
+        const k = i / Math.max(1, passi);
+        tratti.push([x0 + (x1 - x0) * k, y0 + (y1 - y0) * k, r]);
+      }
+    };
+    return { tratti, tratto };
+  }
+
+  /** Un braccio nero che ondeggia fino alla punta, con le dita che si aprono e si chiudono come per afferrare. */
+  function braccio(tratto, x0, y0, xPunta, yPunta, tempo, apre) {
+    let px = x0, py = y0;
+    for (let i = 1; i <= 12; i++) {
+      const u = i / 12;
+      const x = x0 + (xPunta - x0) * u;
+      const y = y0 + (yPunta - y0) * u + Math.sin(u * 5 + tempo * 3) * 5 * Math.sin(u * Math.PI);
+      tratto(px, py, x, y, 3.5 - u * 2);
+      px = x;
+      py = y;
+    }
+    const verso = Math.atan2(yPunta - y0, xPunta - x0);
+    for (let d = 0; d < 4; d++) {
+      const lato = d - 1.5;
+      const angolo = verso + lato * (0.2 + apre * 0.3);
+      const x1 = xPunta + Math.cos(angolo) * 6, y1 = yPunta + Math.sin(angolo) * 6;
+      const piega = angolo - lato * (1 - apre) * 0.7;
+      tratto(xPunta, yPunta, x1, y1, 1.4);
+      tratto(x1, y1, x1 + Math.cos(piega) * 5, y1 + Math.sin(piega) * 5, 0.8);
+    }
+  }
+
+  function disegnaTratti(tratti) {
+    for (const [colore, extra] of [[RIFLESSO_MANI, 1], [COLORE_MANI, 0]]) {
+      ctx.fillStyle = colore;
+      for (const [x, y, r] of tratti) {
+        const lato = Math.max(1, Math.round((r + extra) * 2));
+        ctx.fillRect(Math.round(x - lato / 2), Math.round(y - lato / 2), lato, lato);
+      }
+    }
+  }
+
   function maniNere(s, ingresso, vista) {
+    if (s.boss && !["arrivo", "frenata"].includes(s.boss.fase)) return;
     const quante = Math.min(braccia.length, (s.stage - PRIMO_STAGE_MANI + 1) * MANI_PER_STAGE);
     if (quante <= 0) return;
 
@@ -499,14 +634,7 @@ export function creaRender(canvas, sprite, effetti) {
     // Puntano tutte a Zucco e si fermano prima di toccarlo. Con meno vite si fanno più vicine.
     const vicino = Math.max(DISTANZA_MINIMA, DISTANZA_MANI - crescita * 6 - (VITE - s.vite) * 7);
     const cx = X_ZUCCO + vista, cy = s.zucco.y - 14;
-    const tratti = [];
-    const tratto = (x0, y0, x1, y1, r) => {
-      const passi = Math.ceil(Math.hypot(x1 - x0, y1 - y0));
-      for (let i = 0; i <= passi; i++) {
-        const k = i / Math.max(1, passi);
-        tratti.push([x0 + (x1 - x0) * k, y0 + (y1 - y0) * k, r]);
-      }
-    };
+    const { tratti, tratto } = creaTratti();
 
     for (const b of braccia.slice(0, quante)) {
       const tempo = faseMani * b.ritmo + b.fase;
@@ -521,55 +649,165 @@ export function creaRender(canvas, sprite, effetti) {
       const xPunta = -8 + (dx / totale) * portata;
       const yPunta = b.y + (dy / totale) * portata + Math.sin(tempo * 2.3) * 3 + tremito;
 
-      let px = -8, py = b.y;
-      for (let i = 1; i <= 12; i++) {
-        const u = i / 12;
-        const x = -8 + (xPunta + 8) * u;
-        const y = b.y + (yPunta - b.y) * u + Math.sin(u * 5 + tempo * 3) * 5 * Math.sin(u * Math.PI);
-        tratto(px, py, x, y, 3.5 - u * 2);
-        px = x;
-        py = y;
-      }
-
-      // Le dita si aprono e si chiudono, come per afferrare.
-      const verso = Math.atan2(yPunta - b.y, xPunta + 8);
-      const apre = 0.5 + 0.5 * Math.sin(tempo * 3.1 * (1 + (furia - 1) * 0.5));
-      for (let d = 0; d < 4; d++) {
-        const lato = d - 1.5;
-        const angolo = verso + lato * (0.2 + apre * 0.3);
-        const x1 = xPunta + Math.cos(angolo) * 6, y1 = yPunta + Math.sin(angolo) * 6;
-        const piega = angolo - lato * (1 - apre) * 0.7;
-        tratto(xPunta, yPunta, x1, y1, 1.4);
-        tratto(x1, y1, x1 + Math.cos(piega) * 5, y1 + Math.sin(piega) * 5, 0.8);
-      }
+      braccio(tratto, -8, b.y, xPunta, yPunta, tempo, 0.5 + 0.5 * Math.sin(tempo * 3.1 * (1 + (furia - 1) * 0.5)));
     }
-
-    for (const [colore, extra] of [[RIFLESSO_MANI, 1], [COLORE_MANI, 0]]) {
-      ctx.fillStyle = colore;
-      for (const [x, y, r] of tratti) {
-        const lato = Math.max(1, Math.round((r + extra) * 2));
-        ctx.fillRect(Math.round(x - lato / 2), Math.round(y - lato / 2), lato, lato);
-      }
-    }
+    disegnaTratti(tratti);
 
     if (ingresso > 0) {
       ordaDiMostri(s, ingresso, vista);
       effetti.disegnaOrda(ctx, s, ingresso);
     }
 
-    // Il muro passa sopra la scena, ma Zucco deve restare sempre leggibile.
+  }
+
+  /** Il finale, disegnato nel mondo: la casa, le piattaforme, il boss e tutto quello che vola. */
+  function disegnaCasa(s) {
+    const b = s.boss;
+    if (!b || b.casaX === null) return;
+    const forza = effetti.scosseAttive ? forzaTerremoto(b) : 0;
+    const x = Math.round(b.casaX + (Math.random() - 0.5) * forza * 3);
+    const y = SUOLO - casa.height + 1;
+    ctx.drawImage(casa, x, y);
+    // Il terremoto fa saltare la luce, e mentre lui balza la casa resta al buio.
+    ctx.fillStyle = "#1c1228";
+    LUCI_CASA.forEach(([lx, ly, largo, alto], i) => {
+      if (b.fase === "balzo" || guizzo(b.t, i) < forza * 0.75) ctx.fillRect(x + lx, y + ly, largo, alto);
+    });
+  }
+
+  function disegnaPiattaforme(s) {
+    const k = s.boss?.apertura ?? 0;
+    if (k <= 0) return;
+    const img = sprite.piattaforma[0];
+    const scala = LARGO_PIATTAFORMA / img.width;
+    for (const y of PIATTAFORME) ctx.drawImage(img, X_PIATTAFORMA, Math.round(y + 1 + (1 - k) * 40), img.width * scala, img.height);
+  }
+
+  function posizioneBoss(b) {
+    if (b.fase === "balzo") {
+      const k = Math.min(1, b.t);
+      return { x: -130 + (X_ATTERRAGGIO + 130) * k, y: SUOLO - Math.sin(k * Math.PI) * 46 };
+    }
+    return { x: X_ATTERRAGGIO + (X_BOSS - X_ATTERRAGGIO) * b.apertura, y: SUOLO };
+  }
+
+  function coronaDiMani(bx, by) {
+    const { tratti, tratto } = creaTratti();
+    const cx = bx, cy = by - 74;
+    for (const m of corona) {
+      const tempo = faseMani * m.ritmo + m.fase;
+      const a = m.angolo + Math.sin(tempo * 1.3) * 0.14;
+      const lungo = m.lungo * (0.8 + 0.2 * Math.sin(tempo * 1.9));
+      braccio(tratto, cx + Math.cos(a) * 22, cy + Math.sin(a) * 22, cx + Math.cos(a) * lungo, cy + Math.sin(a) * lungo, tempo, 0.5 + 0.5 * Math.sin(tempo * 3.4));
+    }
+    disegnaTratti(tratti);
+  }
+
+  /** Il lancio parte da una delle sue mani: si protende alla quota giusta con il colpo in pugno e lo scaglia. */
+  function manoCheLancia(bx, by, b) {
+    const lancio = b.carica ?? b.lanciato;
+    if (!lancio) return;
+    const y = CORSIE[lancio.corsia];
+    const k = b.carica ? 1 - b.carica.t / PREAVVISO_LANCIO : 1;
+    const xPunta = bx - 30 + (X_LANCIO - bx + 30) * k * k;
+    const { tratti, tratto } = creaTratti();
+    braccio(tratto, bx - 16, by - 76, xPunta, y, faseMani, b.carica ? 0.05 : 1);
+    disegnaTratti(tratti);
+    if (!b.carica) return;
+    const nome = b.carica.tipo === "pipistrello" ? "pipistrello" : `lancio_${b.carica.tipo}`;
+    const img = evidenti[nome][0];
+    ctx.drawImage(img, Math.round(xPunta - img.width / 2 - 4), Math.round(y - img.height / 2));
+  }
+
+  function disegnaBoss(s) {
+    const b = s.boss;
+    if (!b || FASI_SENZA_BOSS.includes(b.fase)) return;
+    const { x, y } = posizioneBoss(b);
+    const fine = b.fase === "morte" ? Math.min(1, b.t / 2.4) : 0;
+    const respiro = Math.sin(faseMani * 2.2) * 2;
+    const sobbalzo = b.colpito > 0 ? Math.round((Math.random() - 0.5) * 6) : 0;
+    const bx = Math.round(x + sobbalzo);
+    const by = Math.round(y + fine * 50);
+
     ctx.save();
-    ctx.translate(vista, 0);
-    disegnaZucco(s);
+    ctx.globalAlpha = 1 - fine;
+    coronaDiMani(bx, by);
+    ctx.drawImage(corpoBoss, bx - corpoBoss.width / 2, by - corpoBoss.height + 1);
+    const volti = sprite.boss_volto;
+    const espressione = b.colpito > 0 || fine > 0 ? 2 : b.carica || b.fase === "spinta" ? 1 : 0;
+    ctx.drawImage(volti[espressione % volti.length], bx - 32, Math.round(by - 150 + respiro));
+
+    const mani = sprite.boss_mano;
+    const destra = mani[0];
+    ctx.drawImage(destra, bx + 26, Math.round(by - 76 - respiro));
+    ctx.save();
+    ctx.translate(bx - 26, Math.round(by - 66 + respiro));
+    ctx.scale(-1, 1);
+    ctx.drawImage(mani[0], 0, 0);
     ctx.restore();
+    manoCheLancia(bx, by, b);
+    if (b.colpito > 0) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(volti[2 % volti.length], bx - 32, Math.round(by - 150 + respiro));
+      ctx.globalCompositeOperation = "source-over";
+    }
+    ctx.restore();
+  }
+
+  function disegnaProiettili(s) {
+    const b = s.boss;
+    if (!b) return;
+    if (b.mazzaX !== null) {
+      const k = b.fase === "spinta" ? Math.min(1, b.t / 0.9) : 1;
+      const img = sprite.mazza[0];
+      const salto = Math.abs(Math.sin(k * Math.PI * 2)) * (1 - k) * 34;
+      ctx.drawImage(img, Math.round(b.mazzaX - img.width / 2), Math.round(SUOLO - img.height - salto));
+    }
+    for (const p of b.proiettili) {
+      const nome = p.tipo === "pipistrello" ? "pipistrello" : `lancio_${p.tipo}`;
+      const fotogrammi = evidenti[nome];
+      const img = fotogrammi[Math.floor(p.fase * 2) % fotogrammi.length];
+      const x = Math.round(p.x - img.width / 2), y = Math.round(p.y - img.height / 2);
+      ctx.drawImage(img, x, y);
+      if (p.stato === "ritorno") {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.7;
+        ctx.drawImage(img, x, y);
+        ctx.fillStyle = "#ffb52e";
+        ctx.fillRect(x - 12, y + 4, 12, 2);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+      }
+    }
+  }
+
+  function hudBoss(s) {
+    const b = s.boss;
+    if (!b || !["duello", "morte"].includes(b.fase)) return;
+    scrivi("PADRONE DELLE MANI", W / 2, 16, { centro: true, colore: "#ff6b5e" });
+    const largo = VITE_BOSS * 11;
+    for (let i = 0; i < VITE_BOSS; i++) {
+      ctx.fillStyle = "#160f1e";
+      ctx.fillRect(W / 2 - largo / 2 + i * 11 - 1, 25, 10, 7);
+      ctx.fillStyle = i < b.vite ? "#ff3b3b" : "#3b1a26";
+      ctx.fillRect(W / 2 - largo / 2 + i * 11, 26, 8, 5);
+    }
+    if (b.scritta) {
+      const passato = 1.3 - b.scritta.t;
+      const su = Math.round(Math.max(0, 1 - passato * 5) * 16);
+      const colore = Math.floor(passato * 12) % 2 ? "#ffe45e" : "#ff6fa8";
+      scrivi(b.scritta.testo, W / 2, 48 + su, { centro: true, colore, scala: 3 });
+    }
   }
 
   function disegnaZucco(s) {
     const z = s.zucco;
     const y = Math.round(z.y);
+    const spinta = Math.round(s.boss?.spinta ?? 0);
     if (z.stato === "ko") {
       const img = sprite.zucco_ko[0];
-      ctx.drawImage(img, X_ZUCCO - 7, SUOLO - img.height + 1);
+      ctx.drawImage(img, X_ZUCCO - 7, Math.round(z.y) - img.height + 1);
       return;
     }
     if (s.graziaT > 0 && Math.floor(s.tick / 4) % 2) return;
@@ -577,10 +815,15 @@ export function creaRender(canvas, sprite, effetti) {
     let img;
     if (z.stato === "scivola") img = sprite.zucco_scivola[Math.floor(s.tick / 6) % sprite.zucco_scivola.length];
     else if (z.stato === "aria") img = (z.vy < 0 ? sprite.zucco_sale : sprite.zucco_scende)[0];
-    else img = sprite.zucco_corsa[Math.floor(s.distanza / 13) % sprite.zucco_corsa.length];
+    else img = sprite.zucco_corsa[s.velocita > 0 ? Math.floor(s.distanza / 13) % sprite.zucco_corsa.length : 0];
 
-    const x = X_ZUCCO - Math.floor(img.width / 2);
+    const x = X_ZUCCO - Math.floor(img.width / 2) + spinta;
     ctx.drawImage(img, x, y - img.height + 1);
+    if (z.conMazza) {
+      const pose = sprite.mazza_in_mano;
+      const colpo = z.mazzata > 0 ? Math.min(pose.length - 1, Math.floor((10 - z.mazzata) / 2) + 1) : 0;
+      ctx.drawImage(pose[colpo], X_ZUCCO + 4 - 30, y - 14 - 30);
+    }
     if (s.lunaT > 0 && Math.floor(s.tick / 3) % 2) {
       ctx.globalCompositeOperation = "lighter";
       ctx.globalAlpha = 0.6;
@@ -590,6 +833,13 @@ export function creaRender(canvas, sprite, effetti) {
     }
   }
 
+  /** Dalla prima scossa Zucco ha capito che qualcosa non va. */
+  function allarme(s) {
+    const b = s.boss;
+    if (b?.fase !== "silenzio" || b.t < PRESAGIO) return;
+    scrivi("!", X_ZUCCO, Math.round(s.zucco.y) - 46, { centro: true, colore: "#ffe45e", scala: 2 });
+  }
+
   function disegnaDolce(d, i, s) {
     const nomi = ["caramella_rosa", "caramella_verde", "caramella_gialla"];
     const f = sprite[nomi[Math.abs(Math.round(d.y + d.x / 40 + i)) % 3]] ?? sprite.caramella_rosa;
@@ -597,13 +847,26 @@ export function creaRender(canvas, sprite, effetti) {
     ctx.drawImage(img, Math.round(d.x - img.width / 2), Math.round(d.y - img.height / 2 + Math.sin(s.tick / 9 + i) * 1.4));
   }
 
-  function hud(s, record) {
-    scrivi(String(punteggio(s)).padStart(6, "0"), LARGHEZZA - 6, 6, { destra: true, colore: "#ffe45e" });
-    if (record > 0)
-      scrivi(`REC ${String(record).padStart(6, "0")}`, LARGHEZZA - 6, 16, { destra: true, colore: "#c3c1d4" });
+  /** Il moltiplicatore sta accanto alla barra delle caramelle, e diventa rosso per un attimo quando scende. */
+  function mostraMoltiplicatore(s, x, dt) {
+    if (s.moltiplicatore < moltiplicatoreVisto) caloMoltiplicatore = 0.4;
+    moltiplicatoreVisto = s.moltiplicatore;
+    caloMoltiplicatore = Math.max(0, caloMoltiplicatore - dt);
+    const colore = caloMoltiplicatore > 0 ? "#ff5e5e" : s.moltiplicatore > 1 ? "#ffe45e" : "#c3c1d4";
+    scrivi(`X${s.moltiplicatore.toFixed(2)}`, x, 6, { colore });
+  }
 
-    scrivi(`STAGE ${s.stage}`, LARGHEZZA / 2, 6, { centro: true, colore: "#c3c1d4" });
+  function hud(s, record, dt) {
+    scrivi(String(punteggio(s)).padStart(6, "0"), W - 6, 6, { destra: true, colore: "#ffe45e" });
+    if (record > 0)
+      scrivi(`REC ${String(record).padStart(6, "0")}`, W - 6, 16, { destra: true, colore: "#c3c1d4" });
+
+    scrivi(s.boss ? "FINALE" : `STAGE ${s.stage}`, W / 2, 6, { centro: true, colore: "#c3c1d4" });
     for (let i = 0; i < VITE; i++) ctx.drawImage((i < s.vite ? sprite.vita : sprite.vita_persa)[0], 6 + i * 11, 16);
+    for (let i = 0; i < LUNE_PER_PREMIO; i++) {
+      ctx.fillStyle = i < s.lunePulite ? "#fff3b0" : "#3b2a52";
+      ctx.fillRect(41 + i * 6, 18, 4, 4);
+    }
 
     const x = 22, y = 8, largo = 60;
     ctx.drawImage(sprite.caramella_rosa[1], 6, 5);
@@ -614,18 +877,20 @@ export function creaRender(canvas, sprite, effetti) {
     if (s.lunaT > 0) {
       ctx.fillStyle = Math.floor(s.tick / 5) % 2 ? "#fff3b0" : "#ffb52e";
       ctx.fillRect(x, y, Math.round(largo * (s.lunaT / 6)), 4);
-      scrivi("LUNA PIENA!", LARGHEZZA / 2, 16, { centro: true, colore: "#fff3b0" });
+      scrivi("LUNA PIENA!", W / 2, 16, { centro: true, colore: "#fff3b0" });
     } else {
       ctx.fillStyle = "#ff6fa8";
       ctx.fillRect(x, y, Math.round(largo * (s.luna / CARAMELLE_LUNA)), 4);
       ctx.fillStyle = "#ffb2cf";
       ctx.fillRect(x, y, Math.round(largo * (s.luna / CARAMELLE_LUNA)), 1);
     }
+    mostraMoltiplicatore(s, x + largo + 5, dt);
+    if (effetti.annuncio) scrivi(effetti.annuncio, W / 2, 30, { centro: true, colore: "#fff3b0", scala: 2 });
   }
 
   function cartelloStage(s) {
     const trascorso = s.t - (s.stage - 1) * DURATA_STAGE;
-    if (s.stage === 1 || trascorso > 1.7) return;
+    if (s.stage === 1 || s.boss || trascorso > 1.7) return;
     if (trascorso > 1.2 && Math.floor(s.tick / 4) % 2) return;
     scrivi(`STAGE ${s.stage}`, LARGHEZZA / 2, 56, { centro: true, colore: "#ffe45e", scala: 3 });
   }
@@ -633,11 +898,11 @@ export function creaRender(canvas, sprite, effetti) {
   function velo(passaggio) {
     ctx.globalCompositeOperation = "multiply";
     ctx.fillStyle = ATTI[passaggio.da].velo;
-    ctx.fillRect(0, 0, LARGHEZZA, ALTEZZA);
+    ctx.fillRect(0, -60, W, ALTEZZA + 60);
     if (passaggio.k > 0) {
       ctx.globalAlpha = passaggio.k;
       ctx.fillStyle = ATTI[passaggio.a].velo;
-      ctx.fillRect(0, 0, LARGHEZZA, ALTEZZA);
+      ctx.fillRect(0, -60, W, ALTEZZA + 60);
       ctx.globalAlpha = 1;
     }
     ctx.globalCompositeOperation = "source-over";
@@ -647,7 +912,7 @@ export function creaRender(canvas, sprite, effetti) {
   function incupisci(s) {
     ctx.globalAlpha = 0.45 * cupezza(s.t);
     ctx.fillStyle = "#05020a";
-    ctx.fillRect(0, 0, LARGHEZZA, ALTEZZA);
+    ctx.fillRect(0, -60, W, ALTEZZA + 60);
     ctx.globalAlpha = 1;
   }
 
@@ -666,17 +931,46 @@ export function creaRender(canvas, sprite, effetti) {
     ctx.globalAlpha = 1;
   }
 
+  const film = creaCinematica({ ctx, sprite, effetti, casa, cielo: strati[1].cielo, suolo, scrivi });
+
   return {
+    /** Dopo la vittoria: niente HUD, solo la scena al tempo `t`. */
+    cinematica(t) {
+      if (canvas.width !== LARGHEZZA) {
+        canvas.width = LARGHEZZA;
+        canvas.height = ALTEZZA;
+        ctx.imageSmoothingEnabled = false;
+      }
+      film.disegna(t);
+    },
+
     disegna(s, { record = 0, titolo = false, dt = 0 } = {}) {
       const passaggio = passaggioAtti(s.t);
-      const scossa = effetti.scossa;
+      const tremaTerra = effetti.scosseAttive ? forzaTerremoto(s.boss) * 4.5 : 0;
+      const scossa = Math.max(effetti.scossa, tremaTerra);
       const ingresso = ingressoOrda(s.t);
       const vista = Math.round(VISTA_AVANTI * ingresso);
+
+      // La visuale si allarga mostrando più pixel, non rimpicciolendoli: la grafica resta nitida.
+      const apertura = s.boss?.apertura ?? 0;
+      W = LARGHEZZA + 2 * Math.round(40 * apertura);
+      H = Math.round((W * ALTEZZA) / LARGHEZZA);
+      if (canvas.width !== W) {
+        canvas.width = W;
+        canvas.height = H;
+        ctx.imageSmoothingEnabled = false;
+      }
+      const sopra = H - ALTEZZA;
       // Le fasi si accumulano: al cambio di stage le mani accelerano senza fare salti.
       faseMani += dt * furiaMani(s.stage);
       faseOrda += dt;
 
       ctx.save();
+      if (sopra > 0) {
+        ctx.fillStyle = ATTI[passaggio.a].cielo[0];
+        ctx.fillRect(0, 0, W, sopra + 2);
+      }
+      ctx.translate(0, sopra);
       if (scossa > 0.2) ctx.translate(Math.round((Math.random() - 0.5) * scossa * 2), Math.round((Math.random() - 0.5) * scossa * 2));
 
       cielo(s, passaggio);
@@ -687,24 +981,44 @@ export function creaRender(canvas, sprite, effetti) {
 
       ctx.save();
       ctx.translate(vista, 0);
+      disegnaCasa(s);
+      disegnaPiattaforme(s);
       s.dolci.forEach((d, i) => !d.preso && disegnaDolce(d, i, s));
       for (const o of s.ostacoli) if (!o.rotto) disegnaOstacolo(o, s);
+      disegnaBoss(s);
+      disegnaProiettili(s);
       effetti.disegnaDietro(ctx, s);
       disegnaZucco(s);
       effetti.disegna(ctx);
+      allarme(s);
       ctx.restore();
 
       ripeti(primoPiano, 160, s.distanza * 1.3, ALTEZZA - 12);
       oscurita(s, vista);
+
+      // Hanno paura di quello che sta per arrivare: Zucco può rallentare perché loro si ritirano.
+      const fuga = s.boss?.fase === "frenata" ? Math.min(1, s.boss.t / RITIRATA_MANI) ** 2 : 0;
+      ctx.save();
+      ctx.translate(-170 * fuga, 0);
       maniNere(s, ingresso, vista);
       ctx.restore();
 
+      // Il muro passa sopra la scena, ma Zucco deve restare sempre leggibile.
+      if (s.stage >= PRIMO_STAGE_MANI && !s.boss) {
+        ctx.save();
+        ctx.translate(vista, 0);
+        disegnaZucco(s);
+        ctx.restore();
+      }
+      ctx.restore();
+
       if (titolo) {
-        scrivi("LA FUGA DI", LARGHEZZA / 2, 26, { centro: true, colore: "#fff3b0", scala: 2 });
-        scrivi("ZUCCO", LARGHEZZA / 2, 46, { centro: true, colore: "#f59a2e", scala: 5 });
+        scrivi("LA FUGA DI", W / 2, 26, { centro: true, colore: "#fff3b0", scala: 2 });
+        scrivi("ZUCCO", W / 2, 46, { centro: true, colore: "#f59a2e", scala: 5 });
       } else {
-        hud(s, record);
+        hud(s, record, dt);
         cartelloStage(s);
+        hudBoss(s);
       }
     },
 

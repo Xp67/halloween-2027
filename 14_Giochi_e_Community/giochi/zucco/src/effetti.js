@@ -9,11 +9,15 @@ import * as flyingSkull from "pixelfx/fx/critters/flying-skull";
 import * as cartoonPow from "pixelfx/fx/explosions/cartoon-pow";
 import * as smallExplosion from "pixelfx/fx/explosions/small-explosion";
 import * as bluntHit from "pixelfx/fx/impacts/blunt-hit";
+import * as groundSlam from "pixelfx/fx/impacts/ground-slam";
 import * as hitSpark from "pixelfx/fx/impacts/hit-spark";
+import * as darkExplosion from "pixelfx/fx/shadow/dark-explosion";
 import * as summonRise from "pixelfx/fx/spawn/summon-rise";
 import * as haste from "pixelfx/fx/status/haste";
+import * as confetti from "pixelfx/fx/ui/confetti";
 import * as fog from "pixelfx/fx/weather/fog";
 import * as shootingStars from "pixelfx/fx/weather/shooting-stars";
+import { forzaTerremoto } from "./boss.js";
 import { ALTEZZA, LARGHEZZA, SUOLO, X_ZUCCO } from "./sim.js";
 
 const ORO = ["#3a1a08", "#7a3a10", "#c8701a", "#f5a72e", "#ffd24a", "#ffe98a", "#fff6c8", "#ffffff"];
@@ -28,6 +32,12 @@ const LAMPI = {
   urto: { modulo: smallExplosion, ritmo: 1.5, mondo: true },
   ko: { modulo: cartoonPow, ritmo: 1, mondo: false, opzioni: { text: "AHI!" } },
   luna: { modulo: manaBurst, ritmo: 1, mondo: false, opzioni: { palette: ORO } },
+  mazzata: { modulo: hitSpark, ritmo: 1, mondo: false, opzioni: { palette: ORO, height: 0 } },
+  fuoricampo: { modulo: hitSpark, ritmo: 1, mondo: false, opzioni: { palette: ORO, height: 0, aim: -1 } },
+  bossAtterra: { modulo: groundSlam, ritmo: 1.5, mondo: false },
+  bossColpito: { modulo: smallExplosion, ritmo: 1.6, mondo: false },
+  bossMuore: { modulo: darkExplosion, ritmo: 1.2, mondo: false },
+  evviva: { modulo: confetti, ritmo: 1, mondo: false },
 };
 
 // L'evocazione dura 4,6 s ma un ostacolo attraversa lo schermo in poco più di uno: il suo tempo segue la partita.
@@ -64,10 +74,21 @@ const RIGHE_SCIA = [0, 3, 4, 0];
 const POLVERE = {
   salto: { n: 5, forza: 40 },
   atterra: { n: 7, forza: 55 },
+  passo: { n: 2, forza: 22 },
 };
 const COLORI_POLVERE = ["#6b5a7a", "#8f7fa0"];
+const COLORI_SASSI = ["#8f7fa0", "#b3a6c4", "#d8cfe4"];
+const GRAVITA_POLVERE = 260;
+const DETRITI_AL_SECONDO = 140;
+const SASSI_DEL_PRESAGIO = 16;
+const QUOTA_GRONDA = SUOLO - 78;
 
-const SCOSSE = { rotto: 2, urto: 4, luna: 3 };
+const SCOSSE = { rotto: 2, urto: 4, luna: 3, presagio: 3, bossAtterra: 6, bossColpito: 3, bossMuore: 6 };
+const ANNUNCI = {
+  vitaRecuperata: () => "VITA RECUPERATA!",
+  treLune: (punti) => `TRE LUNE! ${punti} PUNTI`,
+};
+const DURATA_ANNUNCIO = 2;
 const INIZIO_STELLE_CADENTI = 40;
 const ORIGINE_METEO = { x: LARGHEZZA / 2, y: 170 };
 
@@ -130,7 +151,9 @@ export function creaEffetti({ scosseAttive, sprite }) {
   let scia = null;
   let storia = [];
   let polvere = [];
+  let detriti = 0;
   let scossa = 0;
+  let annuncio = null;
   let turno = false;
 
   function attoreDi(s) {
@@ -160,6 +183,30 @@ export function creaEffetti({ scosseAttive, sprite }) {
     }
   }
 
+  /** Un sassolino che salta dal suolo e ci ricade: vive esattamente quanto il suo salto. */
+  function sassolino(forza) {
+    const vy = -(30 + Math.random() * 110 * forza);
+    polvere.push({
+      x: Math.random() * (LARGHEZZA + 50) - 50,
+      y: SUOLO,
+      vx: (Math.random() - 0.5) * 24,
+      vy,
+      vita: (-2 * vy) / GRAVITA_POLVERE,
+      colore: COLORI_SASSI[Math.floor(Math.random() * COLORI_SASSI.length)],
+      lato: Math.random() < 0.4 ? 2 : 1,
+    });
+  }
+
+  /** Il terremoto muove la terra anche quando lo schermo non può tremare: sassi dal suolo, polvere dal tetto. */
+  function terremoto(dt, s) {
+    const forza = forzaTerremoto(s.boss);
+    detriti += forza * DETRITI_AL_SECONDO * dt;
+    for (; detriti >= 1; detriti--) {
+      if (Math.random() < 0.7) sassolino(forza);
+      else polvere.push({ x: s.boss.casaX + 22 + Math.random() * 136, y: QUOTA_GRONDA, vx: 0, vy: Math.random() * 20, vita: 0.75, colore: COLORI_POLVERE[1] });
+    }
+  }
+
   function seguiDemoni(dt, s) {
     for (const [o, fx] of demoni)
       if (o.rotto || !s.ostacoli.includes(o)) {
@@ -181,7 +228,8 @@ export function creaEffetti({ scosseAttive, sprite }) {
   }
 
   return {
-    evento({ tipo, x, y }) {
+    evento({ tipo, x, y, punti }) {
+      if (ANNUNCI[tipo]) annuncio = { testo: ANNUNCI[tipo](punti), t: DURATA_ANNUNCIO };
       const lampo = LAMPI[tipo];
       if (lampo) {
         const fx = createFx(lampo.modulo, { ...lampo.opzioni, x, y, seed: Math.floor(Math.random() * 1000) });
@@ -202,15 +250,21 @@ export function creaEffetti({ scosseAttive, sprite }) {
           });
         }
       }
+      if (tipo === "presagio") for (let i = 0; i < SASSI_DEL_PRESAGIO; i++) sassolino(0.4);
       if (scosseAttive && SCOSSE[tipo]) scossa = Math.max(scossa, SCOSSE[tipo]);
     },
 
     aggiorna(dt, s) {
       const scorre = s.finita ? 0 : s.velocita * dt;
 
+      terremoto(dt, s);
+      if (annuncio) {
+        annuncio.t -= dt;
+        if (annuncio.t <= 0) annuncio = null;
+      }
       for (const p of polvere) {
         p.vita -= dt;
-        p.vy += 260 * dt;
+        p.vy += GRAVITA_POLVERE * dt;
         p.x += (p.vx - s.velocita * 0.5) * dt;
         p.y += p.vy * dt;
       }
@@ -291,8 +345,9 @@ export function creaEffetti({ scosseAttive, sprite }) {
 
     disegna(ctx) {
       for (const p of polvere) {
+        const lato = p.lato ?? 1;
         ctx.fillStyle = p.colore;
-        ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+        ctx.fillRect(Math.round(p.x), Math.round(p.y), lato, lato);
       }
       if (!scia && lampi.length === 0) return;
       livelloDavanti.riempi((f) => {
@@ -306,11 +361,19 @@ export function creaEffetti({ scosseAttive, sprite }) {
       return scossa;
     },
 
+    get annuncio() {
+      return annuncio?.testo;
+    },
+
+    scosseAttive,
+
     svuota() {
       lampi = [];
       demoni.clear();
       storia = [];
       polvere = [];
+      detriti = 0;
+      annuncio = null;
       scia = null;
       scossa = 0;
     },

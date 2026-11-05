@@ -2,6 +2,8 @@
 
 // --- La partitura. Il tema è in la minore, con il sol diesis che lo rende inquieto. ---
 
+import { DURATA_TERREMOTO } from "./boss.js";
+
 const ACCORDI = {
   Am: { basso: 45, arpeggio: [69, 72, 76], pad: [57, 60, 64] },
   F: { basso: 41, arpeggio: [65, 69, 72], pad: [53, 57, 60] },
@@ -327,6 +329,7 @@ function soffio(m, dest, { t, durata, vol, tipo = "bandpass", f, fine, q = 1 }) 
   const { ctx } = m;
   const sorgente = ctx.createBufferSource();
   sorgente.buffer = m.rumore;
+  sorgente.loop = true; // il rumore dura un secondo e parte da un punto a caso: i suoni lunghi non devono tagliarsi
   const filtro = ctx.createBiquadFilter();
   filtro.type = tipo;
   filtro.Q.value = q;
@@ -403,6 +406,16 @@ export const SUONI = {
     [660, 880, 1320, 1760].forEach((f, i) => battito(m, d, { forma: "triangle", f, t: t + i * 0.05, durata: 0.09, vol: 0.13 }));
     soffio(m, d, { t, durata: 0.3, vol: 0.06, tipo: "highpass", f: 3000, fine: 8000 });
   },
+  caramellaPersa(m, d, t) {
+    battito(m, d, { forma: "triangle", f: 330, fine: 190, t, durata: 0.06, vol: 0.05 });
+  },
+  // Arrivano insieme alla terza luna: partono appena dopo, per non confondersi col suo accordo.
+  vitaRecuperata(m, d, t) {
+    [523, 784, 1047].forEach((f, i) => battito(m, d, { forma: "triangle", f, t: t + 0.25 + i * 0.08, durata: i === 2 ? 0.28 : 0.1, vol: 0.15 }));
+  },
+  treLune(m, d, t) {
+    [784, 988, 1175, 1568].forEach((f, i) => battito(m, d, { forma: "triangle", f, t: t + 0.25 + i * 0.07, durata: i === 3 ? 0.3 : 0.09, vol: 0.14 }));
+  },
   stage(m, d, t) {
     battito(m, d, { f: 98, t, durata: 0.35, vol: 0.22 });
     battito(m, d, { forma: "triangle", f: 196, t, durata: 0.22, vol: 0.1 });
@@ -439,6 +452,96 @@ export const SUONI = {
     battito(m, d, { forma: "triangle", f: 1500, fine: 900, t, durata: 0.04, vol: 0.07 });
     soffio(m, d, { t, durata: 0.012, vol: 0.06, tipo: "highpass", f: 3000 });
   },
+  passo(m, d, t) {
+    battito(m, d, { f: 96, fine: 58, t, durata: 0.06, vol: 0.18 });
+    soffio(m, d, { t, durata: 0.05, vol: 0.07, tipo: "lowpass", f: 800 });
+  },
+  vento(m, d, t) {
+    [0.05, 0.1, 0.07].forEach((vol, i) => soffio(m, d, { t: t + i * 0.55, durata: 1, vol, f: 380 + i * 120, fine: 700, q: 5 }));
+  },
+  // La prima scossa: un colpo sordo da sotto i piedi, poi di nuovo silenzio.
+  presagio(m, d, t) {
+    battito(m, d, { f: 54, fine: 30, t, durata: 0.6, vol: 0.55 });
+    soffio(m, d, { t, durata: 0.5, vol: 0.3, tipo: "lowpass", f: 150 });
+    briciole(m, d, t + 0.12, 4, 0.05);
+  },
+  // Soffio e battito sanno solo calare: il boato che cresce è fatto di ondate sovrapposte, ognuna più forte.
+  trema(m, d, t) {
+    const ondate = Math.round(DURATA_TERREMOTO / 0.2);
+    for (let i = 0; i < ondate; i++) {
+      const k = (i + 1) / ondate, quando = t + i * 0.2;
+      soffio(m, d, { t: quando, durata: 0.5, vol: 0.08 + 0.34 * k * k, tipo: "lowpass", f: 90 + 110 * k });
+      battito(m, d, { f: 46, fine: 30, t: quando, durata: 0.4, vol: 0.08 + 0.34 * k * k });
+      if (i % 3 === 2) briciole(m, d, quando, 2 + Math.round(4 * k), 0.03 + 0.06 * k);
+    }
+  },
+  balzo(m, d, t) {
+    soffio(m, d, { t, durata: 0.8, vol: 0.3, f: 220, fine: 900, q: 1.5 });
+    battito(m, d, { forma: "sawtooth", f: 64, fine: 120, t, durata: 0.7, vol: 0.2, filtro: 600 });
+  },
+  bossAtterra(m, d, t) {
+    battito(m, d, { f: 90, fine: 26, t, durata: 0.5, vol: 0.6 });
+    soffio(m, d, { t, durata: 0.08, vol: 0.5, tipo: "lowpass", f: 1800 });
+    soffio(m, d, { t, durata: 0.45, vol: 0.34, tipo: "lowpass", f: 300 });
+    briciole(m, d, t, 8, 0.12);
+  },
+  prende(m, d, t) {
+    battito(m, d, { forma: "triangle", f: 523, t, durata: 0.07, vol: 0.14 });
+    battito(m, d, { forma: "triangle", f: 784, t: t + 0.07, durata: 0.11, vol: 0.14 });
+  },
+  colpoAria(m, d, t) {
+    soffio(m, d, { t, durata: 0.1, vol: 0.14, f: 700, fine: 2600, q: 2 });
+  },
+  lancio(m, d, t) {
+    soffio(m, d, { t, durata: 0.14, vol: 0.14, f: 900, fine: 300, q: 2 });
+  },
+  mazzata(m, d, t) {
+    battito(m, d, { forma: "triangle", f: 1500, fine: 500, t, durata: 0.05, vol: 0.3 });
+    soffio(m, d, { t, durata: 0.03, vol: 0.34, tipo: "highpass", f: 2200 });
+    battito(m, d, { f: 240, fine: 120, t, durata: 0.07, vol: 0.26 });
+  },
+  fuoricampo(m, d, t) {
+    SUONI.mazzata(m, d, t);
+    soffio(m, d, { t: t + 0.03, durata: 0.32, vol: 0.16, f: 500, fine: 4000, q: 2 });
+    battito(m, d, { forma: "triangle", f: 1318, t: t + 0.1, durata: 0.2, vol: 0.09 });
+  },
+  bossColpito(m, d, t) {
+    SUONI.urto(m, d, t);
+    battito(m, d, { forma: "sawtooth", f: 120, fine: 60, t: t + 0.04, durata: 0.26, vol: 0.14, filtro: 800 });
+  },
+  bossMuore(m, d, t) {
+    battito(m, d, { f: 110, fine: 24, t, durata: 0.9, vol: 0.6 });
+    soffio(m, d, { t, durata: 0.9, vol: 0.4, tipo: "lowpass", f: 1400, fine: 120 });
+    battito(m, d, { forma: "sawtooth", f: 160, fine: 40, t, durata: 0.8, vol: 0.16, filtro: 900 });
+  },
+  vittoria(m, d, t) {
+    [523, 659, 784, 1047, 1319].forEach((f, i) => battito(m, d, { forma: "triangle", f, t: t + i * 0.09, durata: i === 4 ? 0.34 : 0.1, vol: 0.16 }));
+  },
+  porta(m, d, t) {
+    soffio(m, d, { t, durata: 0.16, vol: 0.2, f: 500, fine: 200, q: 3 });
+    battito(m, d, { f: 150, fine: 90, t: t + 0.12, durata: 0.07, vol: 0.22 });
+  },
+  parla(m, d, t) {
+    [392, 440, 349, 392].forEach((f, i) => battito(m, d, { forma: "triangle", f, t: t + i * 0.08, durata: 0.06, vol: 0.1 }));
+  },
+  versa(m, d, t) {
+    soffio(m, d, { t, durata: 0.7, vol: 0.14, f: 900, fine: 1800, q: 3 });
+  },
+  spuma(m, d, t) {
+    for (let i = 0; i < 7; i++) soffio(m, d, { t: t + i * 0.09, durata: 0.02, vol: 0.09, tipo: "highpass", f: 3500 });
+    soffio(m, d, { t, durata: 0.7, vol: 0.05, tipo: "highpass", f: 5000 });
+  },
+  bicchiere(m, d, t) {
+    battito(m, d, { f: 2400, t, durata: 0.09, vol: 0.12 });
+    battito(m, d, { f: 3600, t, durata: 0.05, vol: 0.06 });
+  },
+  sorso(m, d, t) {
+    battito(m, d, { forma: "triangle", f: 240, fine: 420, t, durata: 0.14, vol: 0.14 });
+  },
+  evviva(m, d, t) {
+    [523, 659, 784, 1047].forEach((f, i) => battito(m, d, { forma: "triangle", f, t: t + i * 0.07, durata: 0.12, vol: 0.14 }));
+    soffio(m, d, { t, durata: 0.32, vol: 0.08, tipo: "highpass", f: 2500 });
+  },
   orda(m, d, t) {
     const f = 70 + Math.random() * 40;
     battito(m, d, { forma: "sawtooth", f, fine: f * 0.7, t, durata: 0.22, vol: 0.12, filtro: 500 });
@@ -451,7 +554,8 @@ const PASSAGGI = { pipistrello: "pipistrello", fantasma: "fantasma", ragno: "rag
 const STAGE_ORDA = 7;
 const MUSICA_ACCESA = 0.85;
 const MUSICA_ABBASSATA = 0.4;
-const COLPI_FORTI = new Set(["urto", "ko", "demone", "mano"]);
+const COLPI_FORTI = new Set(["urto", "ko", "demone", "mano", "bossAtterra", "bossColpito", "bossMuore"]);
+const SCENE_SILENZIOSE = new Set(["frenata", "silenzio", "trema", "balzo", "spinta", "presa"]);
 
 /** La musica segue la partita, gli effetti arrivano dagli eventi di sim.js. */
 export function creaAudio({ muto: partenzaMuta = false } = {}) {
@@ -467,6 +571,7 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
   let caramelle = 0;
   let ultimaCaramella = -1;
   let ruggito = 0;
+  let inScena = false;
 
   const volume = () => (muto ? 0 : 0.62);
 
@@ -505,6 +610,7 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
       m.musica.gain.setValueAtTime(MUSICA_ACCESA, ctx.currentTime);
       stage = 1;
       luna = false;
+      inScena = false;
       frase = 0;
       passo = 0;
       prossimo = ctx.currentTime + 0.08;
@@ -520,7 +626,7 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
         suona(m, "caramella", x, t, caramelle);
       } else if (tipo === "sfiora") suona(m, PASSAGGI[ostacolo] ?? "sfiora", x, t);
       else if (SUONI[tipo]) suona(m, tipo, x, t);
-      if (COLPI_FORTI.has(tipo)) {
+      if (COLPI_FORTI.has(tipo) && !inScena) {
         m.musica.gain.setTargetAtTime(MUSICA_ABBASSATA, t, 0.008);
         m.musica.gain.setTargetAtTime(MUSICA_ACCESA, t + 0.09, 0.12);
       }
@@ -529,7 +635,13 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
     aggiorna(s) {
       stage = s.stage;
       luna = s.lunaT > 0;
-      if (!m || !orologio || stage < STAGE_ORDA || ctx.currentTime < ruggito) return;
+      // Zucco rallenta e la musica si spegne piano: il silenzio prepara il terremoto. Torna col duello.
+      const scena = SCENE_SILENZIOSE.has(s.boss?.fase);
+      if (m && orologio && scena !== inScena) {
+        inScena = scena;
+        m.musica.gain.setTargetAtTime(scena ? 0 : MUSICA_ACCESA, ctx.currentTime, scena ? 1.8 : 0.3);
+      }
+      if (!m || !orologio || s.boss || stage < STAGE_ORDA || ctx.currentTime < ruggito) return;
       ruggito = ctx.currentTime + 1.2 + Math.random() * 2.2;
       suona(m, "orda", -40, ctx.currentTime);
     },
@@ -542,6 +654,16 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
     riprendi() {
       ctx?.resume();
       accendiOrologio();
+    },
+
+    /** Dopo la vittoria la marcetta riparte piano, come se arrivasse dalla festa. */
+    cinematica() {
+      if (!m) return;
+      stage = 1;
+      luna = false;
+      inScena = false;
+      m.musica.gain.cancelScheduledValues(ctx.currentTime);
+      m.musica.gain.setTargetAtTime(0.5, ctx.currentTime, 0.5);
     },
 
     fine() {

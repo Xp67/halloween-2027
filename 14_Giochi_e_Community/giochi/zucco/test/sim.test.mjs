@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  CARAMELLE_LUNA,
   DURATA_STAGE,
   IN,
   SUOLO,
@@ -16,6 +17,8 @@ import {
   risultato,
   scatolaOstacolo,
 } from "../src/sim.js";
+import { CORSIE, PIATTAFORME, TEMPO_BOSS, VITE_BOSS } from "../src/boss.js";
+import { PUNTI_TRE_LUNE } from "../src/punti.js";
 
 const MINUTI = 60 * 60;
 
@@ -187,6 +190,210 @@ test("ogni ostacolo sfiora Zucco una volta sola, alle sue spalle", () => {
   assert.ok(passaggi[0].x < X_ZUCCO);
 });
 
+/** Giocatore automatico del duello: va sulla corsia del lancio più vicino e colpisce quando arriva a tiro. */
+function creaBotDuello({ sbaglia = 0, seed = 1 } = {}) {
+  let a = seed * 2654435761;
+  const caso = () => {
+    a = (Math.imul(a ^ (a >>> 15), 2246822519) + 1) >>> 0;
+    return a / 4294967296;
+  };
+  let salto = 0;
+  let giu = 0;
+  const visti = new Map();
+  return (s) => {
+    const comandi = [];
+    if (salto > 0 && --salto === 0) comandi.push(IN.SALTO_SU);
+    if (giu > 0 && --giu === 0) comandi.push(IN.SCIVOLA_SU);
+    const b = s.boss;
+    if (b?.fase !== "duello") return comandi;
+
+    const z = s.zucco;
+    const pericoli = b.proiettili.filter((p) => p.stato === "vola").sort((p, q) => p.x - q.x);
+    const p = pericoli[0];
+    const mira = p?.y ?? (b.carica ? CORSIE[b.carica.corsia] : null);
+    if (mira === null) return comandi;
+    if (p && !visti.has(p)) visti.set(p, caso() < sbaglia);
+
+    const qui = z.y - 14;
+    const fermo = z.vy === 0;
+    if (fermo && mira < qui - 6 && salto === 0) {
+      comandi.push(IN.SALTO_GIU);
+      salto = 18;
+    } else if (fermo && mira > qui + 6 && giu === 0) {
+      comandi.push(IN.SCIVOLA_GIU);
+      giu = 6;
+    }
+    if (p && !visti.get(p) && Math.abs(p.y - qui) < 14 && p.x < X_ZUCCO + 40 && p.x > X_ZUCCO + 8) comandi.push(IN.MAZZA);
+    return comandi;
+  };
+}
+
+function giocaDuello(seed, opzioni, eventi = []) {
+  const s = creaPartita(seed, (e) => eventi.push(e), { daSecondo: TEMPO_BOSS - 1 });
+  const bot = creaBotDuello({ ...opzioni, seed });
+  while (!s.finita && s.t < TEMPO_BOSS + 240) passo(s, bot(s));
+  return s;
+}
+
+test("alla fine del decimo stage la scena porta al duello, in ordine", () => {
+  const fasi = [];
+  const s = creaPartita(2, () => {}, { daSecondo: TEMPO_BOSS - 1 });
+  while (s.boss?.fase !== "duello" && s.t < TEMPO_BOSS + 30) {
+    s.graziaT = 1;
+    passo(s);
+    const fase = s.boss?.fase;
+    if (fase && fasi.at(-1) !== fase) fasi.push(fase);
+  }
+  assert.deepEqual(fasi, ["arrivo", "frenata", "silenzio", "trema", "balzo", "spinta", "presa", "apertura", "duello"]);
+  assert.equal(s.zucco.conMazza, true);
+  assert.equal(s.boss.vite, VITE_BOSS);
+});
+
+test("durante la scena finale non nascono ostacoli nuovi", () => {
+  const s = creaPartita(2, () => {}, { daSecondo: TEMPO_BOSS - 0.1 });
+  while (!s.boss) passo(s);
+  s.ostacoli = [];
+  while (s.boss.fase === "arrivo") {
+    s.graziaT = 1;
+    passo(s);
+    assert.equal(s.ostacoli.length, 0);
+  }
+});
+
+test("si frena solo con l'ultimo ostacolo alle spalle: a passo d'uomo non si potrebbe più saltarlo", () => {
+  for (let seed = 1; seed <= 12; seed++) {
+    const s = creaPartita(seed, () => {}, { daSecondo: TEMPO_BOSS - 1 });
+    while (s.boss?.fase !== "frenata") {
+      s.graziaT = 1;
+      passo(s);
+    }
+    assert.ok(s.ostacoli.every((o) => o.x + o.w < X_ZUCCO), `seed ${seed}`);
+  }
+});
+
+test("l'arrivo è lento, passa da una prima scossa e la casa si ferma sempre nello stesso punto", () => {
+  const fermate = [];
+  for (const luna of [0, 5]) {
+    const eventi = [];
+    const s = creaPartita(3, (e) => eventi.push(e.tipo), { daSecondo: TEMPO_BOSS - 1 });
+    s.lunaT = luna;
+    while (!s.boss) {
+      s.graziaT = 1;
+      passo(s);
+    }
+    const inizio = s.t;
+    while (s.boss.fase !== "balzo") {
+      s.graziaT = 1;
+      passo(s);
+    }
+    assert.ok(s.t - inizio > 12, `la scena dura ${s.t - inizio} s`);
+    assert.ok(eventi.indexOf("presagio") < eventi.indexOf("trema"));
+    assert.ok(eventi.filter((e) => e === "passo").length >= 8);
+    assert.equal(s.velocita, 0);
+    fermate.push(s.boss.casaX);
+  }
+  assert.equal(fermate[0], fermate[1]);
+});
+
+test("se la scena lo prende a mezz'aria, Zucco torna coi piedi per terra", () => {
+  const s = creaPartita(3, () => {}, { daSecondo: TEMPO_BOSS - 1 });
+  while (s.boss?.fase !== "frenata") {
+    s.graziaT = 1;
+    passo(s);
+  }
+  while (s.boss.fase === "frenata") passo(s, s.velocita < 14 ? [IN.SALTO_GIU] : []);
+  assert.ok(s.zucco.y < SUOLO);
+  while (s.boss.fase === "silenzio") passo(s);
+  assert.equal(s.zucco.y, SUOLO);
+  assert.equal(s.zucco.stato, "corsa");
+});
+
+function inDuello(seed = 1) {
+  const eventi = [];
+  const s = creaPartita(seed, (e) => eventi.push(e), { daSecondo: TEMPO_BOSS - 1 });
+  while (s.boss?.fase !== "duello") {
+    s.graziaT = 1;
+    passo(s);
+  }
+  s.boss.prossimoLancio = 999;
+  s.graziaT = 0;
+  return { s, eventi };
+}
+
+const lanciato = (tipo, x, corsia = 0) => ({ tipo, x, y: CORSIE[corsia], vx: -200, vy: 0, stato: "vola", fase: 0 });
+
+test("un pipistrello colpito torna indietro ed esplode sul boss", () => {
+  const { s, eventi } = inDuello();
+  s.boss.proiettili.push(lanciato("pipistrello", X_ZUCCO + 30));
+  passo(s, [IN.MAZZA]);
+  assert.equal(s.boss.proiettili[0].stato, "ritorno");
+  while (s.boss.proiettili.length) passo(s);
+  assert.equal(s.boss.vite, VITE_BOSS - 1);
+  assert.ok(eventi.some((e) => e.tipo === "bossColpito"));
+});
+
+test("tutto il resto vola fuori con HOMERUUUNNN!!! e non fa male al boss", () => {
+  for (const tipo of ["osso", "teschio", "zucca"]) {
+    const { s } = inDuello();
+    s.boss.proiettili.push(lanciato(tipo, X_ZUCCO + 30));
+    passo(s, [IN.MAZZA]);
+    assert.equal(s.boss.scritta.testo, "HOMERUUUNNN!!!");
+    while (s.boss.proiettili.length) passo(s);
+    assert.equal(s.boss.vite, VITE_BOSS);
+  }
+});
+
+test("un lancio non colpito toglie una vita a Zucco", () => {
+  const { s } = inDuello();
+  s.boss.proiettili.push(lanciato("osso", X_ZUCCO + 20));
+  for (let i = 0; i < 20; i++) passo(s);
+  assert.equal(s.vite, VITE - 1);
+});
+
+test("si può salire sulle due piattaforme e scendere attraversandole", () => {
+  const { s } = inDuello();
+  const sali = () => {
+    passo(s, [IN.SALTO_GIU]);
+    for (let i = 0; i < 18; i++) passo(s);
+    passo(s, [IN.SALTO_SU]);
+    for (let i = 0; i < 50; i++) passo(s);
+  };
+  sali();
+  assert.equal(s.zucco.y, PIATTAFORME[0]);
+  sali();
+  assert.equal(s.zucco.y, PIATTAFORME[1]);
+  passo(s, [IN.SCIVOLA_GIU]);
+  for (let i = 0; i < 8; i++) passo(s);
+  passo(s, [IN.SCIVOLA_SU]);
+  for (let i = 0; i < 60; i++) passo(s);
+  assert.equal(s.zucco.y, PIATTAFORME[0]);
+});
+
+test("il giocatore preciso batte il boss, e il duello dura il giusto", () => {
+  const durate = [];
+  let vittorie = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const s = giocaDuello(seed, {});
+    if (s.vinta) {
+      vittorie++;
+      durate.push(s.boss.durataDuello);
+    }
+  }
+  const m = mediana(durate);
+  console.log(`duello: ${vittorie}/60 vinti, mediana ${m?.toFixed(0)} s`);
+  assert.ok(vittorie >= 54, `${vittorie}/60`);
+  assert.ok(m >= 20 && m <= 70, `mediana ${m} s`);
+});
+
+test("una vittoria vale più di una sconfitta e si rigioca uguale", () => {
+  const s = giocaDuello(3, {});
+  assert.equal(s.vinta, true);
+  assert.ok(punteggio(s) > 5000);
+  const r = risultato(s);
+  assert.equal(r.vinta, true);
+  assert.equal(r.prova, true);
+});
+
 test("rigiocare gli input dà la stessa partita", () => {
   for (const seed of [1, 42, 9001]) {
     const s = gioca(seed, creaBot({ ritardo: 0.05, errore: 0.01, seed }));
@@ -231,6 +438,118 @@ test("venti caramelle accendono la luna piena e gli ostacoli si rompono", () => 
   passo(s);
   assert.equal(s.vite, VITE);
   assert.equal(s.rotti, 1);
+});
+
+const caramella = (x = X_ZUCCO) => ({ x, y: SUOLO - 10, preso: false });
+
+function accendiLuna(s) {
+  s.lunaT = 0;
+  s.luna = CARAMELLE_LUNA - 1;
+  s.dolci.push(caramella());
+  passo(s);
+  assert.ok(s.lunaT > 0);
+}
+
+test("ogni caramella presa alza il moltiplicatore di 0,01", () => {
+  const s = creaPartita(3);
+  passo(s);
+  for (let i = 0; i < 5; i++) s.dolci.push(caramella());
+  passo(s);
+  assert.equal(s.moltiplicatore, 1.05);
+});
+
+test("una caramella saltata abbassa il moltiplicatore di 0,10, una volta sola e mai sotto 1", () => {
+  const s = creaPartita(3);
+  passo(s);
+  s.moltiplicatore = 1.25;
+  s.dolci.push({ x: X_ZUCCO - 10, y: 20, preso: false });
+  for (let i = 0; i < 30; i++) passo(s);
+  assert.equal(s.moltiplicatore, 1.15);
+
+  s.moltiplicatore = 1.05;
+  s.dolci.push({ x: X_ZUCCO - 10, y: 20, preso: false });
+  for (let i = 0; i < 30; i++) passo(s);
+  assert.equal(s.moltiplicatore, 1);
+});
+
+test("perdere una vita abbassa il moltiplicatore di 0,30", () => {
+  const s = creaPartita(3);
+  passo(s);
+  s.moltiplicatore = 1.5;
+  s.ostacoli.push(ostacolo("lapide"));
+  passo(s);
+  assert.equal(s.vite, VITE - 1);
+  assert.equal(s.moltiplicatore, 1.2);
+});
+
+test("il moltiplicatore vale per i punti che arrivano dopo, non per quelli già fatti", () => {
+  const s = creaPartita(3);
+  passo(s);
+  const prima = s.punti;
+  passo(s);
+  const normale = s.punti - prima;
+
+  s.moltiplicatore = 2;
+  const fatti = s.punti;
+  passo(s);
+  assert.ok(Math.abs(s.punti - fatti - normale * 2) < 1e-9);
+
+  s.moltiplicatore = 1;
+  assert.ok(s.punti > fatti);
+});
+
+test("tre lune di fila con tutte le vite danno i punti extra", () => {
+  const eventi = [];
+  const s = creaPartita(3, (e) => eventi.push(e.tipo));
+  passo(s);
+  accendiLuna(s);
+  accendiLuna(s);
+  assert.equal(s.lunePulite, 2);
+  const prima = s.punti;
+  accendiLuna(s);
+  assert.ok(s.punti - prima >= PUNTI_TRE_LUNE);
+  assert.equal(s.lunePulite, 0);
+  assert.equal(s.vite, VITE);
+  assert.ok(eventi.includes("treLune"));
+});
+
+test("tre lune di fila senza colpi ridanno una vita, non i punti", () => {
+  const eventi = [];
+  const s = creaPartita(3, (e) => eventi.push(e.tipo));
+  passo(s);
+  s.vite = 1;
+  for (let i = 0; i < 3; i++) accendiLuna(s);
+  assert.equal(s.vite, 2);
+  assert.ok(eventi.includes("vitaRecuperata"));
+  assert.ok(!eventi.includes("treLune"));
+});
+
+test("perdere una vita azzera il conto delle lune", () => {
+  const s = creaPartita(3);
+  passo(s);
+  accendiLuna(s);
+  accendiLuna(s);
+  s.lunaT = 0;
+  s.graziaT = 0;
+  s.ostacoli.push(ostacolo("lapide"));
+  passo(s);
+  assert.equal(s.vite, VITE - 1);
+  assert.equal(s.lunePulite, 0);
+
+  accendiLuna(s);
+  accendiLuna(s);
+  assert.equal(s.vite, VITE - 1);
+  accendiLuna(s);
+  assert.equal(s.vite, VITE);
+});
+
+test("nel finale le caramelle non accendono più la luna, che non si spegnerebbe", () => {
+  const s = creaPartita(3, () => {}, { daSecondo: TEMPO_BOSS - 0.1 });
+  while (!s.boss) passo(s);
+  s.luna = CARAMELLE_LUNA - 1;
+  s.dolci.push(caramella());
+  passo(s);
+  assert.equal(s.lunaT, 0);
 });
 
 test("il giocatore perfetto passa 3 minuti senza un colpo: nessuno schema è impossibile", () => {

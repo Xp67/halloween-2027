@@ -1,34 +1,39 @@
 // Logica di gioco pura: niente DOM, niente orologio, niente Math.random.
 // Stesso seed + stessi input = stessa partita, così il server può rigiocarla per validare il punteggio.
 
-export const VERSIONE = 1;
-export const LARGHEZZA = 320;
-export const ALTEZZA = 180;
-export const SUOLO = 150;
-export const TICK = 1 / 60;
-export const X_ZUCCO = 56;
+import { TEMPO_BOSS, iniziaBoss, mazzata, passoBoss } from "./boss.js";
+import {
+  BUFFER_SALTO,
+  DURATA_STAGE,
+  GRAVITA,
+  GRAVITA_PICCHIATA,
+  GRAZIA_COLPO,
+  IN,
+  LARGHEZZA,
+  SPINTA,
+  SUOLO,
+  TAGLIO_SALTO,
+  TICK,
+  TOLLERANZA_BORDO,
+  VITE,
+  X_ZUCCO,
+} from "./costanti.js";
+import { PIXEL_PER_PUNTO, caramellaPersa, caramellaPresa, guadagna, lunaAccesa, perdiVita } from "./punti.js";
+
+export { ALTEZZA, DURATA_STAGE, IN, LARGHEZZA, SUOLO, TICK, VITE, X_ZUCCO } from "./costanti.js";
+
+export const VERSIONE = 2;
 export const CARAMELLE_LUNA = 20;
-export const VITE = 3;
-export const DURATA_STAGE = 20;
 
-export const IN = { SALTO_GIU: 1, SALTO_SU: 2, SCIVOLA_GIU: 3, SCIVOLA_SU: 4 };
-
-const GRAVITA = 1150;
-const SPINTA = -345;
-const TAGLIO_SALTO = -150;
-const GRAVITA_PICCHIATA = 2.4;
-const BUFFER_SALTO = 7;
-const TOLLERANZA_BORDO = 5;
 const DURATA_LUNA = 6;
 const GRAZIA_LUNA = 1;
-const GRAZIA_COLPO = 1.5;
 const VELOCITA_INIZIALE = 135;
 const PASSO_STAGE = 32;
 const RAMPA_STAGE = 1;
 const TREGUA_STAGE = 1.3;
 const PUNTI_CARAMELLA = 10;
 const PUNTI_ROTTO = 25;
-const PIXEL_PER_PUNTO = 12;
+const CARAMELLA_SALTATA = 18;
 
 const ZUCCO_IN_PIEDI = { w: 12, h: 24 };
 const ZUCCO_SCIVOLA = { w: 18, h: 12 };
@@ -85,23 +90,29 @@ function generatore(seed) {
 
 const interpola = (a, b, k) => a + (b - a) * k;
 
-export function creaPartita(seed, alEvento = () => {}) {
+/** `daSecondo` fa partire la partita più avanti: serve solo a provare il finale, e il risultato resta segnato come prova. */
+export function creaPartita(seed, alEvento = () => {}, { daSecondo = 0 } = {}) {
   return {
     seed,
     rng: generatore(seed),
     alEvento,
-    tick: 0,
-    t: 0,
+    prova: daSecondo > 0,
+    tick: Math.round(daSecondo / TICK),
+    t: daSecondo,
     velocita: 0,
     distanza: 0,
-    bonus: 0,
+    punti: 0,
+    moltiplicatore: 1,
+    lunePulite: 0,
     caramelle: 0,
     rotti: 0,
     luna: 0,
     lunaT: 0,
     graziaT: 0,
     vite: VITE,
-    stage: 1,
+    stage: stageA(daSecondo),
+    boss: null,
+    vinta: false,
     finita: false,
     daGenerare: 260,
     ostacoli: [],
@@ -151,6 +162,7 @@ function applicaComando(s, c) {
   } else if (c === IN.SALTO_SU) s.tieniSalto = false;
   else if (c === IN.SCIVOLA_GIU) s.tieniGiu = true;
   else if (c === IN.SCIVOLA_SU) s.tieniGiu = false;
+  else if (c === IN.MAZZA) mazzata(s);
 }
 
 function muoviZucco(s) {
@@ -269,7 +281,13 @@ function scorri(s, spostamento) {
       s.alEvento({ tipo: "sfiora", ostacolo: o.tipo, x: X_ZUCCO - 30 });
     }
   }
-  for (const d of s.dolci) d.x -= quanto;
+  for (const d of s.dolci) {
+    d.x -= quanto;
+    if (!d.preso && !d.saltata && d.x < X_ZUCCO - CARAMELLA_SALTATA) {
+      d.saltata = true;
+      caramellaPersa(s, d);
+    }
+  }
   // Quando la vista si sposta in avanti la parte sinistra dello schermo arriva a x negative.
   s.ostacoli = s.ostacoli.filter((o) => o.x + o.w > -100);
   s.dolci = s.dolci.filter((d) => d.x > -100 && !d.preso);
@@ -283,11 +301,11 @@ function urti(s) {
     if (s.lunaT > 0) {
       o.rotto = true;
       s.rotti++;
-      s.bonus += PUNTI_ROTTO;
+      guadagna(s, PUNTI_ROTTO);
       s.alEvento({ tipo: "rotto", x: o.x + o.w / 2, y: Math.max(o.y, SUOLO - 30) });
     } else if (s.graziaT <= 0) {
       o.rotto = true;
-      s.vite--;
+      perdiVita(s);
       s.graziaT = GRAZIA_COLPO;
       s.alEvento({ tipo: "urto", x: o.x + o.w / 2, y: SUOLO });
       if (s.vite > 0) continue;
@@ -303,14 +321,17 @@ function urti(s) {
     if (d.preso || !sovrapposti(presa, { x: d.x - 5, y: d.y - 3, w: 10, h: 6 })) continue;
     d.preso = true;
     s.caramelle++;
-    s.bonus += s.lunaT > 0 ? PUNTI_CARAMELLA * 2 : PUNTI_CARAMELLA;
+    guadagna(s, s.lunaT > 0 ? PUNTI_CARAMELLA * 2 : PUNTI_CARAMELLA);
+    caramellaPresa(s);
     s.alEvento({ tipo: "caramella", x: d.x, y: d.y });
-    if (s.lunaT > 0) continue;
+    // Nel finale la luna non si spegnerebbe più: le ultime caramelle valgono solo i loro punti.
+    if (s.lunaT > 0 || s.boss) continue;
     s.luna++;
     if (s.luna >= CARAMELLE_LUNA) {
       s.luna = 0;
       s.lunaT = DURATA_LUNA;
       s.alEvento({ tipo: "luna", x: X_ZUCCO, y: s.zucco.y - 14 });
+      lunaAccesa(s);
     }
   }
 }
@@ -333,6 +354,13 @@ export function passo(s, comandi = []) {
   }
   s.tick++;
   s.t = s.tick * TICK;
+
+  if (!s.boss && s.t >= TEMPO_BOSS) iniziaBoss(s);
+  if (s.boss) {
+    passoBoss(s, { muoviZucco, scorri, urti });
+    return;
+  }
+
   s.velocita = velocitaA(s.t) * (s.lunaT > 0 ? 1.2 : 1);
 
   const stage = stageA(s.t);
@@ -344,7 +372,7 @@ export function passo(s, comandi = []) {
 
   const spostamento = s.velocita * TICK;
   s.distanza += spostamento;
-  if (s.lunaT > 0) s.bonus += spostamento / PIXEL_PER_PUNTO;
+  guadagna(s, ((s.lunaT > 0 ? 2 : 1) * spostamento) / PIXEL_PER_PUNTO);
 
   muoviZucco(s);
   scorri(s, spostamento);
@@ -353,7 +381,7 @@ export function passo(s, comandi = []) {
   urti(s);
 }
 
-export const punteggio = (s) => Math.floor(s.distanza / PIXEL_PER_PUNTO + s.bonus);
+export const punteggio = (s) => Math.floor(s.punti);
 
 /** Quello che il client manda al server a fine partita. */
 export function risultato(s) {
@@ -363,10 +391,13 @@ export function risultato(s) {
     tick: s.tick,
     input: s.input,
     punteggio: punteggio(s),
+    moltiplicatore: s.moltiplicatore,
     caramelle: s.caramelle,
     rotti: s.rotti,
     stage: s.stage,
     vite: s.vite,
+    vinta: s.vinta,
+    prova: s.prova,
   };
 }
 

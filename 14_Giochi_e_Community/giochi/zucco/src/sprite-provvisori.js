@@ -12,7 +12,7 @@ const COLORI = {
   a: "#8a5ad0", A: "#5f3fa8", c: "#a03a66", x: "#ff3b3b",
   W: "#f4fbff", C: "#bfe3f0", N: "#7fa8cc",
   u: "#ff6fa8", U: "#c02a68", t: "#37d6c2", z: "#128a8c", Y: "#ffe45e", Z: "#d68a18",
-  f: "#7a5a44", F: "#4e3628", H: "#d03a2c", J: "#7e1a20",
+  f: "#7a5a44", F: "#4e3628", H: "#d03a2c", J: "#7e1a20", Q: "#030104", X: "#8a1e36",
 };
 const CHIAVI = Object.keys(COLORI);
 const PALETTA = Object.values(COLORI);
@@ -489,6 +489,113 @@ function diavoletto(f) {
   return t;
 }
 
+// Il Padrone delle Mani: nero come le mani che ti inseguono, con lo stesso riflesso rosso.
+function volto(espressione) {
+  const t = new Tela(64, 64);
+  for (const lato of [-1, 1])
+    for (let i = 0; i < 26; i++) {
+      const k = i / 25;
+      const x = Math.round(32 + lato * (17 + 12 * k + 3 * Math.sin(k * 3)));
+      const y = Math.round(24 - 22 * k);
+      t.rett(x - 2, y - 1, k < 0.7 ? 4 : 2, 3, "Q");
+    }
+  for (let y = 12; y < 64; y++)
+    for (let x = 6; x < 58; x++) {
+      const dx = (x - 32) / 23, dy = (y - 38) / 26;
+      if (dx * dx + dy * dy <= 1) t.punto(x, y, "Q");
+    }
+  t.contorna("X");
+
+  const occhio = (cx, verso) => {
+    if (espressione === "colpito") {
+      t.linea(cx - 4, 28, cx + 4, 36, "W");
+      t.linea(cx + 4, 28, cx - 4, 36, "W");
+      return;
+    }
+    for (let i = 0; i < 10; i++) {
+      const alto = 30 + Math.round(verso * (i - 5) * 0.5);
+      t.rett(cx - 5 + i, alto, 1, 5 - Math.abs(i - 5) / 2, "x");
+    }
+    t.rett(cx - 1, 31, 3, 2, "Y");
+  };
+  occhio(21, 1);
+  occhio(43, -1);
+
+  if (espressione === "ruggito") {
+    t.rett(17, 42, 30, 15, "k");
+    t.rett(19, 44, 26, 11, "J");
+    for (let x = 18; x < 46; x += 5) {
+      t.linea(x, 42, x + 2, 48, "W");
+      t.linea(x + 2, 56, x + 4, 50, "W");
+    }
+  } else {
+    for (let x = 18; x < 46; x++) t.punto(x, 48 + ((x % 6) < 3 ? 0 : 2), "X");
+    for (let x = 20; x < 46; x += 6) t.linea(x, 47, x + 1, 51, "C");
+  }
+  return t;
+}
+
+function manoGigante(posa) {
+  const t = new Tela(48, 48);
+  t.rett(12, 26, 24, 20, "Q");
+  for (const [dita, base] of [[0, 14], [1, 20], [2, 26], [3, 32]]) {
+    const apertura = (dita - 1.5) * (posa === "aperta" ? 4 : posa === "artiglio" ? 2 : 0.6);
+    const lungo = posa === "pugno" ? 8 : 20 - Math.abs(dita - 1.5) * 2;
+    const punta = [base + Math.round(apertura), 26 - lungo];
+    for (const lato of [0, 1, 2]) t.linea(base + lato, 27, punta[0] + lato - 1, punta[1], "Q");
+    if (posa === "artiglio") t.linea(punta[0], punta[1], punta[0] + (dita < 2 ? 3 : -3), punta[1] + 5, "Q");
+  }
+  for (const lato of [0, 1, 2, 3]) t.linea(12 + lato, 34, 2 + lato, 22, "Q");
+  return t.contorna("X");
+}
+
+function mazza() {
+  const t = new Tela(30, 8);
+  for (let x = 0; x < 30; x++) {
+    const grosso = x < 10 ? 1 : Math.min(3, 1 + Math.floor((x - 10) / 6));
+    t.rett(x, 4 - grosso, 1, grosso * 2, x < 7 ? "k" : "f");
+    t.punto(x, 4 - grosso, x < 7 ? "L" : "h");
+  }
+  return t.contorna();
+}
+
+/** La mazza in mano, a vari angoli: da caricata a fine colpo. */
+function mazzaInMano(gradi) {
+  const t = new Tela(60, 60);
+  const a = (gradi * Math.PI) / 180;
+  for (let i = 0; i < 26; i++) {
+    const x = Math.round(30 + Math.cos(a) * i), y = Math.round(30 + Math.sin(a) * i);
+    const grosso = i < 9 ? 1 : i < 18 ? 2 : 3;
+    t.rett(x - (grosso >> 1), y - (grosso >> 1), grosso, grosso, i < 7 ? "k" : "f");
+  }
+  return t.contorna();
+}
+
+function piattaforma() {
+  const t = new Tela(60, 9);
+  for (let y = 0; y < 9; y++)
+    for (let x = 0; x < 60; x++) {
+      if (y > 5 && (x < 3 + (y - 5) * 2 || x > 56 - (y - 5) * 2)) continue;
+      const k = y / 9 + (hash(x, y) - 0.5) * 0.3;
+      t.punto(x, y, k < 0.3 ? "s" : k < 0.65 ? "S" : "d");
+    }
+  for (let x = 2; x < 58; x++) if (hash(x, 1) > 0.6) t.punto(x, 0, hash(x, 2) > 0.5 ? "m" : "M");
+  return t.contorna();
+}
+
+function osso() {
+  return new Tela(16, 8).stampa([
+    ".kk..........kk.",
+    "kWWk........kWWk",
+    "kWWWkkkkkkkkWWCk",
+    ".kWWWWWWWWWWWCk.",
+    ".kWWWWWWWWWWCCk.",
+    "kWWCkkkkkkkkWCCk",
+    "kWCk........kCCk",
+    ".kk..........kk.",
+  ]);
+}
+
 const VITA = [
   "....g....",
   "..kkGkk..",
@@ -506,12 +613,21 @@ export const SPRITE_PROVVISORI = {
   zucco_scende: sprite(zucco({ avanti: [5, 2], dietro: [-5, 3], mantello: 1, oscilla: -1 })),
   zucco_scivola: sprite(zuccoScivola(0), zuccoScivola(1)),
   zucco_ko: sprite(new Tela(14, 13).stampa(TESTA, 0, 0, { e: "b", E: "o" })),
+  zucco_testa: sprite(new Tela(14, 13).stampa(TESTA)),
   vita: sprite(new Tela(9, 8).stampa(VITA)),
   vita_persa: sprite(new Tela(9, 8).stampa(VITA, 0, 0, { O: "D", y: "d", E: "k", b: "k", g: "D", G: "D" })),
   orda_scheletro: sprite(...[0, 1, 2, 3].map(scheletro)),
   orda_zombie: sprite(...[0, 1, 2, 3].map(zombie)),
   orda_lupo: sprite(...[0, 1, 2, 3].map(lupo)),
   orda_diavoletto: sprite(...[0, 1, 2, 3].map(diavoletto)),
+  boss_volto: sprite(volto("fermo"), volto("ruggito"), volto("colpito")),
+  boss_mano: sprite(manoGigante("aperta"), manoGigante("artiglio"), manoGigante("pugno")),
+  mazza: sprite(mazza()),
+  mazza_in_mano: sprite(...[-125, -70, -10, 45].map(mazzaInMano)),
+  piattaforma: sprite(piattaforma()),
+  lancio_osso: sprite(osso()),
+  lancio_teschio: sprite(new Tela(8, 7).stampa(TESCHIO)),
+  lancio_zucca: sprite(new Tela(14, 13).stampa(TESTA, 0, 0, { O: "V", y: "v", o: "M", h: "v", e: "x", E: "J", b: "k", g: "F", G: "F" })),
   lapide: sprite(lapide()),
   croce: sprite(croce()),
   recinto: sprite(recinto()),

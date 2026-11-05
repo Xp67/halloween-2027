@@ -1,6 +1,6 @@
 # La fuga di Zucco
 
-Il primo gioco del sito: un runner a tema Halloween, grafica 16 bit a 320×180. Zucco, un ragazzino con la testa di zucca e una lanterna, scappa di notte da un cimitero, e la notte si fa sempre più nera. Il genere è quello del dinosauro di Chrome, ma personaggio, grafica e nome sono nostri, come chiede il [README della sezione](../../README.md).
+Il primo gioco del sito: un runner a tema Halloween, grafica 16 bit a 320×180. Zucco, un festaiolo adulto con la testa di zucca e una lanterna, scappa di notte da un cimitero, e la notte si fa sempre più nera. Il genere è quello del dinosauro di Chrome, ma personaggio, grafica e nome sono nostri, come chiede il [README della sezione](../../README.md).
 
 ## Provarlo
 
@@ -18,8 +18,10 @@ npm test      # logica di gioco, compresi i bot che misurano la durata delle par
 | Tastiera | Spazio, freccia su, W per saltare; freccia giù, S per scivolare; Esc o P per la pausa |
 | Telefono | Tasti Salta e Scivola; toccare il gioco fa saltare |
 | Vite | 3. Ogni colpo fa esplodere l'ostacolo e dà 1,5 secondi di invulnerabilità |
-| Punti | 1 ogni 12 px percorsi, 10 per caramella, 25 per ostacolo rotto |
+| Punti | 1 ogni 12 px percorsi, 10 per caramella, 25 per ostacolo rotto. Tutti passano dal moltiplicatore |
 | Luna piena | Con 20 caramelle, per 6 secondi: Zucco rompe tutto, più veloce, punti raddoppiati, e il buio sparisce |
+| Moltiplicatore | Parte da ×1,00 e non scende mai sotto. +0,01 per ogni caramella presa, −0,10 per ogni caramella saltata, −0,30 per ogni vita persa. Vale per i punti che arrivano da quel momento: quelli già fatti restano |
+| Tre lune di fila | Tre lune piene senza perdere vite: se manca una vita torna, con tutte le vite sono 1.000 punti, moltiplicati. Il conto riparte da zero dopo il premio o dopo un colpo |
 | Buio | Negli stage pari dal quarto: per circa 14 secondi si vede bene solo nel cerchio della lanterna |
 
 ## Stage
@@ -41,6 +43,21 @@ Il fondo si scurisce di continuo fino allo stage 7, ma gli ostacoli no: hanno un
 
 Con un bot che sbaglia come una persona la durata mediana è di circa 150 secondi, fino allo stage 8. Va confermata con persone vere: dallo stage 7 in poi si vede anche meno lontano.
 
+### Il finale
+
+Alla fine del decimo stage (200 secondi) gli ostacoli finiscono: mani e orda si ritirano, la musica si spegne e Zucco rallenta fino a camminare verso una casa con il cartello «Festa Halloween» e il logo GetInvolved. Si frena solo con l'ultimo ostacolo alle spalle, perché a passo d'uomo non si potrebbe più saltarlo. Davanti alla casa Zucco si ferma: silenzio, una prima scossa, poi il terremoto cresce a ondate per oltre tre secondi con sassi, polvere e luci che saltano. Al culmine la terra si ferma, la casa resta al buio e il Padrone delle Mani gli salta davanti, l'atterraggio spinge indietro Zucco e gli fa arrivare davanti una mazza da baseball. Zucco la prende, la visuale si allarga, compaiono due piattaforme e il gioco diventa un duello.
+
+- Il boss ha 10 vite ed è circondato dalle sue mille mani. Una si protende alla quota giusta con il colpo in pugno e lo scaglia in linea retta: così si vede dove arriverà
+- Solo i pipistrelli gli fanno male: arrivano all'altezza delle piattaforme e, colpiti con la mazza, tornano indietro ed esplodono su di lui
+- Ossa, teschi e zucche marce si possono colpire, ma volano fuori con la scritta HOMERUUUNNN!!!. Un lancio che arriva addosso toglie una vita a Zucco
+- Più vite perde il boss, più i lanci sono veloci e frequenti
+- Battuto il boss la partita finisce con la vittoria: 5.000 punti, 1.000 per ogni vita rimasta e un premio se è stato rapido. Così anche chi vince resta in classifica
+- Poi parte la cinematica (`src/cinematica.js`, 26 secondi, si salta con un tocco): Zucco entra in casa, l'orda sta ballando alla festa, al bancone ordina un negroni sbagliato allo scheletro barista, beve e augura buona festa mentre l'inquadratura si chiude su di lui. Si chiude con «GetInvolved ti augura un buon Halloween!». È solo racconto: il punteggio è già definitivo
+
+Comandi: salto per salire, giù per scendere di un piano, tasto X o freccia destra per la mazza. Su telefono compare il tasto Mazza.
+
+Per provare il finale senza giocare 200 secondi: aggiungere `?boss=1` all'indirizzo. Queste partite non salvano il record e il risultato resta segnato come prova.
+
 ### Mani nere e orda
 
 Sono **solo grafica**: `sim.js` non le conosce, non tolgono vite e si fermano sempre prima di toccare Zucco. Vivono in `render.js`.
@@ -54,6 +71,8 @@ Sono **solo grafica**: `sim.js` non le conosce, non tolgono vite e si fermano se
 | File | Cosa fa |
 |---|---|
 | `src/sim.js` | Regole del gioco. Niente DOM: gira anche in Node |
+| `src/boss.js` | Regole del finale: la scena e il duello |
+| `src/cinematica.js` | La scena dopo la vittoria |
 | `src/render.js` | Disegna cielo, parallasse, sprite, mani, orda e HUD |
 | `src/gioco.js` | `avviaGioco(elemento, { seme, alTermine })`: monta il gioco in qualunque pagina, restituisce la funzione per smontarlo |
 | `src/effetti.js` | Tutti gli effetti pixelfx |
@@ -90,7 +109,7 @@ Il codice non cambia: le collisioni non dipendono dalle misure del disegno. Gli 
 
 | Nome | Fotogrammi | Misure | Soggetto |
 |---|---|---|---|
-| `zucco_corsa` | 6 | 28×31 | Ragazzino con testa di zucca intagliata e illuminata, mantello viola, lanterna in mano, corre verso destra |
+| `zucco_corsa` | 6 | 28×31 | Adulto con testa di zucca intagliata e illuminata, mantello viola, lanterna in mano, corre verso destra |
 | `zucco_sale` / `zucco_scende` | 1 + 1 | 28×31 | Lo stesso, in salto: gambe raccolte / gambe distese |
 | `zucco_scivola` | 2 | 32×19 | Lo stesso, in scivolata bassa, mantello all'indietro |
 | `zucco_ko` | 1 | 14×13 | Solo la testa di zucca a terra, spenta |
@@ -108,6 +127,12 @@ Il codice non cambia: le collisioni non dipendono dalle misure del disegno. Gli 
 | `orda_zombie` | 4 | 20×27 | Zombie che corre verso destra, braccia protese |
 | `orda_lupo` | 4 | 31×20 | Lupo mannaro al galoppo verso destra, occhi rossi |
 | `orda_diavoletto` | 4 | 19×20 | Diavoletto rosso con forcone, salta verso destra |
+| `boss_volto` | 3 | 64×64 | Maschera nera cornuta con riflesso rosso: ferma, ruggito, colpita |
+| `boss_mano` | 3 | 48×48 | Mano nera gigante: aperta, artiglio, pugno |
+| `mazza` | 1 | 30×8 | Mazza da baseball di legno |
+| `mazza_in_mano` | 4 | 60×60 | La mazza che ruota attorno alla mano |
+| `piattaforma` | 1 | 60×9 | Lastra di pietra sospesa, con muschio |
+| `lancio_osso` / `_teschio` / `_zucca` | 1 ciascuno | 16×8, 8×7, 14×13 | Quello che il boss lancia oltre ai pipistrelli |
 
 Gli ostacoli vanno tenuti chiari: quello che uccide deve leggersi sul fondo scuro. Il demone non è in elenco perché lo disegna pixelfx.
 
@@ -125,6 +150,7 @@ Gli ostacoli vanno tenuti chiari: quello che uccide deve leggersi sul fondo scur
 | Luna piena | `status/haste` con la sagoma di Zucco, solo la parte frontale |
 | Demone | `spawn/summon-rise`, con il tempo sincronizzato su `sim.js` |
 | Orda in volo | `critters/flying-skull`, `critters/eyeball`, `critters/bat` |
+| Boss | `impacts/ground-slam` all'atterraggio, `explosions/small-explosion` sui colpi, `shadow/dark-explosion` alla morte |
 | Sfondo | `weather/fog`, `weather/shooting-stars` |
 
 - La scia della luna piena è fatta in `effetti.js`, con la grafica di `status/haste`: ogni immagine sta dove Zucco è passato davvero, quindi se salta quelle dietro restano a terra
