@@ -1,0 +1,186 @@
+:root {
+  --zucco-fondo: #0b0714;
+  --zucco-testo: #fff3b0;
+  --zucco-arancio: #f59a2e;
+  --zucco-arancio-scuro: #9c3b17;
+  --zucco-viola: #2e1b52;
+  --zucco-viola-chiaro: #7b55c4;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--zucco-fondo);
+}
+
+.zucco {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100dvh;
+  font-family: "Courier New", ui-monospace, monospace;
+  color: var(--zucco-testo);
+  background: var(--zucco-fondo);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.zucco-palco {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.zucco-schermo {
+  display: block;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+
+.zucco-pannello {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  padding-top: 18dvh;
+  pointer-events: none;
+}
+
+.zucco-pannello[hidden] {
+  display: none;
+}
+
+.zucco-pannello > * {
+  pointer-events: auto;
+}
+
+.zucco-esito {
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  background: var(--zucco-viola);
+  border: 3px solid #160f1e;
+}
+
+.zucco-azioni {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zucco button {
+  font: inherit;
+  font-weight: 700;
+  color: #160f1e;
+  cursor: pointer;
+  border: 3px solid #160f1e;
+  touch-action: manipulation;
+}
+
+.zucco-gioca {
+  min-width: 140px;
+  padding: 10px 20px;
+  font-size: 20px !important;
+  text-transform: uppercase;
+  background: var(--zucco-arancio);
+  box-shadow: inset -3px -3px 0 var(--zucco-arancio-scuro), inset 3px 3px 0 #ffd07a;
+}
+
+.zucco-gioca:active {
+  box-shadow: inset 3px 3px 0 var(--zucco-arancio-scuro);
+}
+
+.zucco-gioca:focus-visible,
+.zucco-aiuto:focus-visible {
+  outline: 3px solid var(--zucco-testo);
+  outline-offset: 2px;
+}
+
+.zucco-aiuto {
+  width: 44px;
+  height: 44px;
+  font-size: 20px !important;
+  color: var(--zucco-testo) !important;
+  background: var(--zucco-viola);
+  box-shadow: inset 2px 2px 0 var(--zucco-viola-chiaro);
+}
+
+.zucco-comandi {
+  max-width: 420px;
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.35;
+  background: var(--zucco-viola);
+  border: 3px solid #160f1e;
+}
+
+.zucco-comandi p {
+  margin: 0 0 6px;
+}
+
+.zucco-comandi p:last-child {
+  margin-bottom: 0;
+}
+
+.zucco-tocco {
+  display: none;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+
+.zucco-tocco button {
+  min-height: 96px;
+  font-size: 20px;
+  text-transform: uppercase;
+  touch-action: none;
+}
+
+.zucco-salta {
+  background: var(--zucco-arancio);
+  box-shadow: inset -3px -3px 0 var(--zucco-arancio-scuro), inset 3px 3px 0 #ffd07a;
+}
+
+.zucco-scivola {
+  color: var(--zucco-testo) !important;
+  background: var(--zucco-viola);
+  box-shadow: inset 3px 3px 0 var(--zucco-viola-chiaro);
+}
+
+@media (pointer: coarse) {
+  .zucco-tocco {
+    display: grid;
+  }
+}
+
+/* Telefono in orizzontale: i tasti stanno sopra il gioco, agli angoli. */
+@media (pointer: coarse) and (orientation: landscape) {
+  .zucco {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .zucco-tocco {
+    position: fixed;
+    inset: auto 0 0;
+    grid-template-columns: 110px 110px;
+    justify-content: space-between;
+    padding: 8px 16px;
+    pointer-events: none;
+  }
+
+  .zucco-tocco button {
+    min-height: 72px;
+    font-size: 15px;
+    opacity: 0.7;
+    pointer-events: auto;
+  }
+}

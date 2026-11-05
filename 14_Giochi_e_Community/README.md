@@ -20,14 +20,16 @@ Giochi brevi (partite da 1-3 minuti), a tema Halloween, giocabili da telefono. I
 
 | Gioco | Meccanica | Note |
 |---|---|---|
-| | es. runner / schiva gli ostacoli | |
+| [La fuga di Zucco](giochi/zucco/README.md) | Runner a stage: 3 vite, salta, scivola, raccogli caramelle per la luna piena, scappa da mani nere e orda di mostri | Prima versione giocabile con effetti pixelfx, sprite provvisori |
 | | es. colpisci gli zombie (reazione) | |
 | | es. memory / puzzle a tempo | |
 | | es. quiz horror | Si possono svelare indizi sulla festa |
 
 Tutti i giochi vanno ideati da noi, non copiati da giochi esistenti (nomi, personaggi, grafica).
 
-**Da decidere:** quanti giochi, chi li sviluppa, con quale tecnologia (HTML5 Canvas, Phaser, ecc.). Il frontend di [GetInvolved](../05_Biglietteria/README.md#base-esistente-progetto-getinvolved) è in React: i giochi si possono inserire come pagine del sito.
+*Deciso il 2026-11-05.* Grafica 16 bit, sprite con [SpriteForge](https://spriteforge.tech) ed effetti con [pixelfx](https://github.com/patch-gg/pixelfx). I giochi stanno in [`giochi/`](giochi/), uno per cartella.
+
+**Da decidere:** quanti giochi e chi li sviluppa. Il frontend di [GetInvolved](../05_Biglietteria/README.md#base-esistente-progetto-getinvolved) è in React: i giochi si possono inserire come pagine del sito. La fuga di Zucco è in HTML5 Canvas senza motore di gioco, e si monta in una pagina con una sola funzione.
 
 ## Classifiche
 
