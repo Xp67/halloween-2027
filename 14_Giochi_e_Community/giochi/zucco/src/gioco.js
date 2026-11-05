@@ -1,11 +1,13 @@
 // Monta il gioco dentro un elemento: basta questo per inserirlo in una pagina del sito.
 
+import { creaAudio } from "./audio.js";
 import { creaEffetti } from "./effetti.js";
 import { creaRender } from "./render.js";
 import { ALTEZZA, IN, LARGHEZZA, TICK, creaPartita, passo, punteggio, risultato } from "./sim.js";
 import { caricaSprite } from "./sprite.js";
 
 const CHIAVE_RECORD = "zucco.record";
+const CHIAVE_MUTO = "zucco.muto";
 const ATTESA_RIGIOCA = 450;
 const ATTESA_AIUTO = 1500;
 
@@ -16,11 +18,13 @@ const MARKUP = `
       <p class="zucco-esito" hidden></p>
       <div class="zucco-azioni">
         <button class="zucco-gioca" type="button">Gioca</button>
+        <button class="zucco-suono" type="button" aria-label="Audio" aria-pressed="true">&#9835;</button>
         <button class="zucco-aiuto" type="button" aria-label="Comandi" aria-expanded="false">?</button>
       </div>
       <div class="zucco-comandi" hidden>
         <p><b>Salta:</b> spazio, freccia su o tocco. Tieni premuto per saltare più in alto.</p>
         <p><b>Scivola:</b> freccia giù. In aria ti fa scendere prima.</p>
+        <p><b>Audio:</b> tasto M o la nota qui accanto. In cuffia si sente da dove arrivano le cose.</p>
         <p><b>Caramelle:</b> con 20 arriva la luna piena e per 6 secondi rompi tutto.</p>
       </div>
     </div>
@@ -47,6 +51,22 @@ function salvaRecord(valore) {
   }
 }
 
+function leggiMuto() {
+  try {
+    return localStorage.getItem(CHIAVE_MUTO) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function salvaMuto(valore) {
+  try {
+    localStorage.setItem(CHIAVE_MUTO, valore ? "1" : "0");
+  } catch {
+    // Senza storage la scelta dura solo fino alla chiusura della pagina.
+  }
+}
+
 const nuovoSeme = () => crypto.getRandomValues(new Uint32Array(1))[0];
 
 /**
@@ -65,11 +85,13 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   const bottone = trova("gioca");
   const aiuto = trova("aiuto");
   const comandi = trova("comandi");
+  const tastoSuono = trova("suono");
 
   const movimentoRidotto = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const sprite = await caricaSprite(new URL("../", import.meta.url));
   const effetti = creaEffetti({ scosseAttive: !movimentoRidotto, sprite });
   const render = creaRender(schermo, sprite, effetti);
+  const audio = creaAudio({ muto: leggiMuto() });
 
   let s = creaPartita(0);
   let stato = "titolo";
@@ -89,7 +111,11 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
 
   function inizia() {
     effetti.svuota();
-    s = creaPartita(seme(), (e) => effetti.evento(e));
+    audio.avvia();
+    s = creaPartita(seme(), (e) => {
+      effetti.evento(e);
+      audio.evento(e);
+    });
     coda = [];
     accumulo = 0;
     stato = "gioco";
@@ -101,11 +127,13 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   function pausa() {
     if (stato !== "gioco") return;
     stato = "pausa";
+    audio.pausa();
     mostraPannello("Riprendi");
   }
 
   function riprendi() {
     stato = "gioco";
+    audio.riprendi();
     pannello.hidden = true;
     coda = [];
     // I tasti tenuti prima della pausa non hanno più il loro rilascio.
@@ -115,6 +143,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
 
   function termina() {
     stato = "fine";
+    audio.fine();
     fineAlle = performance.now();
     const punti = punteggio(s);
     const nuovoRecord = punti > record;
@@ -139,6 +168,15 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
 
   bottone.addEventListener("click", azionePrincipale);
 
+  function alternaSuono() {
+    audio.muto = !audio.muto;
+    salvaMuto(audio.muto);
+    tastoSuono.setAttribute("aria-pressed", String(!audio.muto));
+  }
+
+  tastoSuono.setAttribute("aria-pressed", String(!audio.muto));
+  tastoSuono.addEventListener("click", alternaSuono);
+
   const TASTI_SALTO = new Set(["Space", "ArrowUp", "KeyW"]);
   const TASTI_GIU = new Set(["ArrowDown", "KeyS"]);
 
@@ -148,6 +186,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
       else if (stato === "pausa") riprendi();
       return;
     }
+    if (e.code === "KeyM" && !e.repeat) return alternaSuono();
     const salto = TASTI_SALTO.has(e.code);
     if (!salto && !TASTI_GIU.has(e.code)) return;
     e.preventDefault();
@@ -219,6 +258,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
         coda = [];
         accumulo -= TICK;
       }
+      audio.aggiorna(s);
       if (s.finita) termina();
     } else if (stato === "titolo") {
       s.distanza += 70 * dt;
@@ -244,6 +284,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
 
   return function smonta() {
     attivo = false;
+    audio.chiudi();
     osservatore.disconnect();
     removeEventListener("keydown", tastoGiu);
     removeEventListener("keyup", tastoSu);

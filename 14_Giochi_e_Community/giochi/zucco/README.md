@@ -57,8 +57,27 @@ Sono **solo grafica**: `sim.js` non le conosce, non tolgono vite e si fermano se
 | `src/render.js` | Disegna cielo, parallasse, sprite, mani, orda e HUD |
 | `src/gioco.js` | `avviaGioco(elemento, { seme, alTermine })`: monta il gioco in qualunque pagina, restituisce la funzione per smontarlo |
 | `src/effetti.js` | Tutti gli effetti pixelfx |
+| `src/audio.js` | Musica ed effetti sonori, generati dal browser: nessun file audio |
 | `src/sprite.js` | Carica gli sprite nel formato SpriteForge |
 | `src/sprite-provvisori.js` | Sprite provvisori, disegnati in codice |
+
+## Audio
+
+Musica ed effetti nascono nel browser, quindi non ci sono file né licenze. Partono dal primo tocco su Gioca, perché i browser non fanno partire l'audio da soli. Si toglie con il tasto M o con la nota sul pannello.
+
+La musica è un tema unico, nostro, arrangiato come una marcetta macabra che saltella (`suonaPassoCarnevale`): basso oom-pah, campane, xilofono e note che rimbalzano. A ogni stage accelera e si riempie; oltre il nono resta sull'ultima voce. In `src/audio.js` ci sono anche due arrangiamenti alternativi, limpido e cupo (`suonaPasso`), che il gioco oggi non usa.
+
+Gli effetti durano meno di mezzo secondo e hanno un posto nello spazio: `luogo()` in `src/audio.js` li mette a destra o a sinistra di Zucco, e quello che è lontano arriva più piccolo, più sordo e con più riverbero. Si sente meglio in cuffia.
+
+| Momento | Effetto |
+|---|---|
+| Salto, atterraggio, scivolata | Soffio, tonfo e strusciata di terra |
+| Mano di zombie | Colpo secco di terra, con le zolle che ricadono |
+| Demone | Il cerchio di rune si accende, poi schianto, terreno che cede e ringhio |
+| Passaggi | Ostacoli, pipistrelli, fantasmi e ragni passano da destra a sinistra |
+| Caramelle | Due note, che salgono se le prendi di fila |
+| Colpo, ultimo colpo, ostacolo rotto | Esplosione, schianto di zucca, pietra che si spacca |
+| Orda | Ringhi alle spalle, a sinistra, dallo stage 7 |
 
 ## Sprite: SpriteForge
 

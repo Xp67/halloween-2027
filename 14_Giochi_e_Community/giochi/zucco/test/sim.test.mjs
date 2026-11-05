@@ -160,6 +160,33 @@ test("il demone esce da terra poco prima di Zucco e non prima", () => {
   assert.ok(demone.x > X_ZUCCO + s.velocita * 0.4, "deve lasciare il tempo di reagire");
 });
 
+test("la mano e il demone si annunciano una volta sola, quando escono da terra", () => {
+  const eventi = [];
+  const s = creaPartita(1, (e) => eventi.push(e));
+  passo(s);
+  s.daGenerare = 99999;
+  s.graziaT = 99;
+  for (const tipo of ["mano", "demone"]) s.ostacoli.push({ ...ostacolo(tipo, 340), salita: 0, carica: 0, x0: 340 });
+  while (s.ostacoli.some((o) => o.salita < 1)) passo(s);
+  for (let i = 0; i < 30; i++) passo(s);
+  assert.equal(eventi.filter((e) => e.tipo === "mano").length, 1);
+  assert.equal(eventi.filter((e) => e.tipo === "demone").length, 1);
+});
+
+test("ogni ostacolo sfiora Zucco una volta sola, alle sue spalle", () => {
+  const eventi = [];
+  const s = creaPartita(1, (e) => eventi.push(e));
+  passo(s);
+  s.daGenerare = 99999;
+  s.graziaT = 99;
+  s.ostacoli.push({ ...ostacolo("pipistrello", 200), y: 60 });
+  while (s.ostacoli.length) passo(s);
+  const passaggi = eventi.filter((e) => e.tipo === "sfiora");
+  assert.equal(passaggi.length, 1);
+  assert.equal(passaggi[0].ostacolo, "pipistrello");
+  assert.ok(passaggi[0].x < X_ZUCCO);
+});
+
 test("rigiocare gli input dà la stessa partita", () => {
   for (const seed of [1, 42, 9001]) {
     const s = gioca(seed, creaBot({ ritardo: 0.05, errore: 0.01, seed }));

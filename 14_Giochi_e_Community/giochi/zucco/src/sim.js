@@ -180,7 +180,9 @@ function muoviZucco(s) {
     }
   }
 
+  const prima = z.stato;
   z.stato = z.y < SUOLO ? "aria" : s.tieniGiu ? "scivola" : "corsa";
+  if (z.stato === "scivola" && prima !== "scivola") s.alEvento({ tipo: "scivola", x: X_ZUCCO, y: SUOLO });
 }
 
 function nuovoOstacolo(tipo, x, opzioni = {}, rng) {
@@ -231,6 +233,7 @@ function genera(s, spostamento) {
   for (const [tipo, dx, opzioni] of schema.parti) {
     const o = nuovoOstacolo(tipo, x0 + dx, opzioni, s.rng);
     s.ostacoli.push(o);
+    if (tipo === "demone") s.alEvento({ tipo: "rune", x: o.x, y: SUOLO });
     fine = Math.max(fine, o.x + o.w);
   }
 
@@ -256,7 +259,14 @@ function scorri(s, spostamento) {
     if (spunta) {
       const sveglia = X_ZUCCO + s.velocita * spunta.anticipo;
       o.carica = Math.min(1, (o.x0 - o.x) / Math.max(1, o.x0 - sveglia));
-      if (o.x < sveglia) o.salita = Math.min(1, o.salita + spunta.ritmo * TICK);
+      if (o.x < sveglia) {
+        if (o.salita === 0) s.alEvento({ tipo: o.tipo, x: o.x + o.w / 2, y: SUOLO });
+        o.salita = Math.min(1, o.salita + spunta.ritmo * TICK);
+      }
+    }
+    if (!o.passato && !o.rotto && o.x + o.w < X_ZUCCO - 6) {
+      o.passato = true;
+      s.alEvento({ tipo: "sfiora", ostacolo: o.tipo, x: X_ZUCCO - 30 });
     }
   }
   for (const d of s.dolci) d.x -= quanto;
