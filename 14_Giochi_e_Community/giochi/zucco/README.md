@@ -94,7 +94,7 @@ Gli ostacoli vanno tenuti chiari: quello che uccide deve leggersi sul fondo scur
 
 ## Effetti: pixelfx
 
-[pixelfx](https://github.com/patch-gg/pixelfx) (licenza MIT) è installato da GitHub. Il commit è fissato in `package-lock.json` con un indirizzo SSH: in una build Docker senza chiave GitHub va usato l'indirizzo HTTPS.
+[pixelfx](https://github.com/patch-gg/pixelfx) (licenza MIT) è installato da GitHub. Il commit è fissato in `package-lock.json` e nel `Dockerfile`: se cambia, va aggiornato in tutti e due.
 
 | Momento | Effetto |
 |---|---|
@@ -112,6 +112,30 @@ Gli ostacoli vanno tenuti chiari: quello che uccide deve leggersi sul fondo scur
 - `weather/falling-leaves` e `weather/fireflies` non si possono usare: dipingono uno sfondo pieno sopra la scena
 - La polvere di salto e atterraggio è fatta a mano: pixelfx non ha niente di così piccolo
 - Per aggiungere un effetto va aggiunta una riga anche alla mappa degli import in `index.html`
+
+## Pubblicazione
+
+Provvisoriamente il gioco sta su **https://zucco.getinvolvd.com**: un container di file statici sul server di ELEFIX, con l'etichetta di Caddy come le istanze. Il tunnel manda già `*.getinvolvd.com` a Caddy, quindi su Cloudflare non serve fare nulla. Finché il container non gira, quell'indirizzo mostra ELEFIX.
+
+Prima volta, sul server:
+
+```sh
+sudo mkdir -p /opt/halloween-2027 && sudo chown $USER /opt/halloween-2027
+git clone --branch feat/gioco-zucco https://github.com/Xp67/halloween-2027.git /opt/halloween-2027
+cd /opt/halloween-2027/14_Giochi_e_Community/giochi/zucco
+docker compose up -d --build
+docker compose ps
+```
+
+Aggiornamento:
+
+```sh
+cd /opt/halloween-2027/14_Giochi_e_Community/giochi/zucco
+git pull
+docker compose up -d --build
+```
+
+Per toglierlo: `docker compose down`. Per cambiare nome: etichetta `caddy` in `docker-compose.yml`, senza usare il nome di un'istanza ELEFIX.
 
 ## Anti-imbroglio
 

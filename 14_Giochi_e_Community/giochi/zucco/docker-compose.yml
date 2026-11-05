@@ -1,0 +1,22 @@
+# La fuga di Zucco su https://zucco.getinvolvd.com.
+# Provvisorio: si appoggia a Caddy di ELEFIX come un'istanza, finché il sito GetInvolved non è online.
+# Il tunnel manda già *.getinvolvd.com a Caddy, che legge l'etichetta: su Cloudflare non serve fare nulla.
+name: zucco
+
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    networks:
+      - elefix_proxy
+    labels:
+      caddy: http://zucco.getinvolvd.com
+      caddy.reverse_proxy: "{{upstreams 80}}"
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+
+networks:
+  elefix_proxy:
+    external: true
