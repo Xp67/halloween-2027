@@ -5,9 +5,14 @@ name: zucco
 
 services:
   web:
-    build: .
+    build:
+      context: .
+      target: web
     restart: unless-stopped
+    depends_on:
+      - classifica
     networks:
+      - default
       - elefix_proxy
     labels:
       caddy: http://zucco.getinvolvd.com
@@ -16,6 +21,26 @@ services:
       resources:
         limits:
           memory: 64m
+
+  # Solo per la versione di prova: sul sito la classifica sarà legata al profilo.
+  # Sta sulla rete privata del progetto, la raggiunge solo nginx. Il limite di CPU protegge le istanze
+  # che girano sullo stesso server, perché ogni salvataggio rigioca una partita intera.
+  classifica:
+    build:
+      context: .
+      target: classifica
+    restart: unless-stopped
+    init: true
+    volumes:
+      - classifica:/dati
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+
+volumes:
+  classifica:
 
 networks:
   elefix_proxy:

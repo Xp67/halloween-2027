@@ -17,6 +17,7 @@ import {
   risultato,
   scatolaOstacolo,
 } from "../src/sim.js";
+import { FORMA_BOSS, GIRI_BOSS, MELODIE_BOSS, TEMA_BOSS, fraseBossDopo, livelloTemaBoss } from "../src/audio.js";
 import { CORSIE, PIATTAFORME, TEMPO_BOSS, VITE_BOSS } from "../src/boss.js";
 import { PUNTI_TRE_LUNE } from "../src/punti.js";
 
@@ -550,6 +551,28 @@ test("nel finale le caramelle non accendono più la luna, che non si spegnerebbe
   s.dolci.push(caramella());
   passo(s);
   assert.equal(s.lunaT, 0);
+});
+
+test("il tema del boss si fa più furioso man mano che il boss perde vite", () => {
+  assert.deepEqual([VITE_BOSS, 7, 6, 4, 3, 1].map(livelloTemaBoss), [0, 0, 1, 1, 2, 2]);
+  for (let i = 1; i < TEMA_BOSS.length; i++) assert.ok(TEMA_BOSS[i].bpm > TEMA_BOSS[i - 1].bpm);
+});
+
+test("la partitura del boss sta dentro le sue frasi e l'ingresso non torna", () => {
+  for (const frase of FORMA_BOSS) assert.equal(GIRI_BOSS[frase].length, 4);
+  for (const note of Object.values(MELODIE_BOSS)) {
+    let fine = 0;
+    for (const [passo, , durata] of note) {
+      assert.ok(passo >= fine, `note sovrapposte al sedicesimo ${passo}`);
+      fine = passo + durata;
+    }
+    assert.equal(fine, 64);
+  }
+  let i = 0;
+  for (let giro = 0; giro < 20; giro++) {
+    i = fraseBossDopo(i);
+    assert.notEqual(FORMA_BOSS[i], "I");
+  }
 });
 
 test("il giocatore perfetto passa 3 minuti senza un colpo: nessuno schema è impossibile", () => {

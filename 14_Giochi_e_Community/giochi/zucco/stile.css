@@ -57,6 +57,12 @@ body {
   display: none;
 }
 
+/* Dopo la vittoria sullo schermo c'è il saluto: il pannello gli lascia il posto. */
+.zucco-pannello.in-fondo {
+  justify-content: flex-end;
+  padding-top: 16px;
+}
+
 .zucco-pannello > * {
   pointer-events: auto;
 }
@@ -101,12 +107,15 @@ body {
 
 .zucco-gioca:focus-visible,
 .zucco-suono:focus-visible,
-.zucco-aiuto:focus-visible {
+.zucco-tabella:focus-visible,
+.zucco-aiuto:focus-visible,
+.zucco-salva:focus-visible {
   outline: 3px solid var(--zucco-testo);
   outline-offset: 2px;
 }
 
-.zucco-aiuto {
+.zucco-aiuto,
+.zucco-tabella {
   width: 44px;
   height: 44px;
   font-size: 20px !important;
@@ -126,6 +135,107 @@ body {
 
 .zucco-suono[aria-pressed="true"] {
   color: var(--zucco-testo) !important;
+}
+
+.zucco-nome {
+  display: flex;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.zucco-nome[hidden] {
+  display: none;
+}
+
+/* Sotto i 16px iPhone ingrandisce la pagina, e senza user-select il campo su Safari non si lascia scrivere. */
+.zucco-campo {
+  box-sizing: border-box;
+  width: 18ch;
+  min-width: 0;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--zucco-testo);
+  background: #160f1e;
+  border: 3px solid var(--zucco-viola-chiaro);
+  border-radius: 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.zucco-campo::placeholder {
+  color: #9b92b5;
+}
+
+.zucco-campo:focus {
+  border-color: var(--zucco-arancio);
+  outline: none;
+}
+
+.zucco-salva {
+  padding: 8px 14px;
+  font-size: 18px !important;
+  background: var(--zucco-arancio);
+  box-shadow: inset -3px -3px 0 var(--zucco-arancio-scuro), inset 3px 3px 0 #ffd07a;
+}
+
+.zucco-salva:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.zucco-classifica {
+  box-sizing: border-box;
+  width: min(360px, 100%);
+  max-height: min(44dvh, 300px);
+  padding: 10px 14px;
+  overflow-y: auto;
+  background: var(--zucco-viola);
+  border: 3px solid #160f1e;
+}
+
+.zucco-classifica h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--zucco-arancio);
+  text-transform: uppercase;
+}
+
+.zucco-elenco {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zucco-elenco li {
+  display: grid;
+  grid-template-columns: 4ch minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.zucco-posizione {
+  text-align: right;
+}
+
+.zucco-chi {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zucco-tua {
+  color: #160f1e;
+  background: var(--zucco-arancio);
+}
+
+.zucco-avviso {
+  margin: 0;
+  font-size: 15px;
 }
 
 .zucco-comandi {

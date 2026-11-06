@@ -74,17 +74,46 @@ Sono **solo grafica**: `sim.js` non le conosce, non tolgono vite e si fermano se
 | `src/boss.js` | Regole del finale: la scena e il duello |
 | `src/cinematica.js` | La scena dopo la vittoria |
 | `src/render.js` | Disegna cielo, parallasse, sprite, mani, orda e HUD |
-| `src/gioco.js` | `avviaGioco(elemento, { seme, alTermine })`: monta il gioco in qualunque pagina, restituisce la funzione per smontarlo |
+| `src/gioco.js` | `avviaGioco(elemento, { seme, alTermine, classifica })`: monta il gioco in qualunque pagina, restituisce la funzione per smontarlo |
+| `src/classifica.js` | Il modulo per il nome e l'elenco dei migliori |
+| `server/` | La classifica di prova: rigioca la partita e salva nome e punti |
 | `src/effetti.js` | Tutti gli effetti pixelfx |
 | `src/audio.js` | Musica ed effetti sonori, generati dal browser: nessun file audio |
 | `src/sprite.js` | Carica gli sprite nel formato SpriteForge |
 | `src/sprite-provvisori.js` | Sprite provvisori, disegnati in codice |
+
+## Classifica di prova
+
+Solo per questa versione: sul sito il nome verrà dal profilo. Quando una partita batte il record personale, quello salvato nel browser, il gioco chiede un nome. Da quel momento solo il tasto Rigioca rinuncia: un tocco sullo schermo non fa perdere il record. Il tasto con la corona mostra i primi dieci in qualunque momento, e chi sta più in basso vede comunque la sua posizione.
+
+- Il server non si fida del punteggio: rigioca la partita con lo stesso `sim.js`, e 12 minuti di gioco costano una decina di millisecondi
+- Vale il punteggio migliore di ogni nome, maiuscole e minuscole non contano. La stessa partita entra una volta sola
+- Chiunque può usare un nome già preso, se fa più punti: senza profili non c'è modo di distinguerli
+- I nomi non sono filtrati. Sono mostrati come testo, quindi non possono iniettare nulla, ma una parolaccia resta finché non la si toglie a mano
+- `npm start` serve anche la classifica, con i dati in `.dati/classifica.json`
+- Online è il container `classifica`: lo raggiunge solo nginx su `/api/classifica`, e se si ferma il gioco continua a funzionare senza classifica
+
+I dati stanno nel volume `zucco_classifica` e restano anche dopo `docker compose up -d --build`. Per togliere un nome, dalla cartella del gioco sul server:
+
+```sh
+docker compose exec classifica node -e '
+  const fs = require("fs"), f = process.env.FILE_CLASSIFICA;
+  fs.writeFileSync(f, JSON.stringify(JSON.parse(fs.readFileSync(f)).filter((v) => v.nome !== "Nome da togliere")));
+'
+docker compose restart classifica
+```
+
+Per azzerarla: `docker compose exec classifica rm /dati/classifica.json`, poi lo stesso `restart`. Alzando `VERSIONE` le partite già in classifica restano, ma i punteggi con regole diverse non sono confrontabili: conviene azzerarla.
+
+Per passare al sito: `avviaGioco` riceve una `classifica` con gli stessi `leggi` e `salva`, e il servizio `classifica` di `docker-compose.yml` si può togliere insieme alla cartella `server/`.
 
 ## Audio
 
 Musica ed effetti nascono nel browser, quindi non ci sono file né licenze. Partono dal primo tocco su Gioca, perché i browser non fanno partire l'audio da soli. Si toglie con il tasto M o con la nota sul pannello.
 
 La musica è un tema unico, nostro, arrangiato come una marcetta macabra che saltella (`suonaPassoCarnevale`): basso oom-pah, campane, xilofono e note che rimbalzano. A ogni stage accelera e si riempie; oltre il nono resta sull'ultima voce. In `src/audio.js` ci sono anche due arrangiamenti alternativi, limpido e cupo (`suonaPasso`), che il gioco oggi non usa.
+
+Il duello ha un tema suo (`suonaPassoBoss`): lo stesso motivo della fuga, in re minore, su un basso che spinge a gruppi di tre, con organo e rintocchi di campana. Attacca appena Zucco prende la mazza e sparisce quando il boss muore. Segue le vite del boss: a 6 vite accelera e si sdoppia, a 3 sale di un semitono e la cassa raddoppia. Il cambio arriva sempre a fine frase, così non ci sono strappi.
 
 Gli effetti durano meno di mezzo secondo e hanno un posto nello spazio: `luogo()` in `src/audio.js` li mette a destra o a sinistra di Zucco, e quello che è lontano arriva più piccolo, più sordo e con più riverbero. Si sente meglio in cuffia.
 
@@ -160,7 +189,7 @@ Gli ostacoli vanno tenuti chiari: quello che uccide deve leggersi sul fondo scur
 
 ## Pubblicazione
 
-Provvisoriamente il gioco sta su **https://zucco.getinvolvd.com**: un container di file statici sul server di ELEFIX, con l'etichetta di Caddy come le istanze. Il tunnel manda già `*.getinvolvd.com` a Caddy, quindi su Cloudflare non serve fare nulla. Finché il container non gira, quell'indirizzo mostra ELEFIX.
+Provvisoriamente il gioco sta su **https://zucco.getinvolvd.com**: un container di file statici sul server di ELEFIX, con l'etichetta di Caddy come le istanze, e accanto il piccolo container della classifica. Il tunnel manda già `*.getinvolvd.com` a Caddy, quindi su Cloudflare non serve fare nulla. Finché il container non gira, quell'indirizzo mostra ELEFIX.
 
 Prima volta, sul server:
 
@@ -187,6 +216,6 @@ Per toglierlo: `docker compose down`. Per cambiare nome: etichetta `caddy` in `d
 La partita è deterministica: con lo stesso seed e gli stessi input il risultato è identico. `alTermine` riceve seed, input e punteggio, e `rigioca(seed, input)` rifà la partita da zero. Il server può quindi ricalcolare il punteggio invece di fidarsi del numero che arriva. Effetti, mani e orda non entrano nel calcolo.
 
 - Il seed va dato dal server con la sessione di gioco, tramite l'opzione `seme` di `avviaGioco`
-- Il backend è in Python: per rigiocare serve un piccolo processo Node, oppure riscrivere `sim.js`
+- Il backend è in Python: per rigiocare serve un piccolo processo Node, oppure riscrivere `sim.js`. La classifica di prova fa già così, ma il seed lo sceglie ancora il browser
 - Il rigioco smaschera i punteggi inventati, non i bot che giocano davvero: per quelli restano i controlli manuali sui primi in classifica
 - Ogni modifica alle regole deve alzare `VERSIONE` in `sim.js`: le partite vecchie non si rigiocano con regole nuove

@@ -33,8 +33,9 @@
   <body>
     <main id="gioco"></main>
     <script type="module">
+      import { classificaDiProva } from "./src/classifica.js";
       import { avviaGioco } from "./src/gioco.js";
-      avviaGioco(document.getElementById("gioco"));
+      avviaGioco(document.getElementById("gioco"), { classifica: classificaDiProva("/api/classifica") });
     </script>
   </body>
 </html>

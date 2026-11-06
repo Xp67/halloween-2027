@@ -3,6 +3,7 @@
 import { creaAudio } from "./audio.js";
 import { TEMPO_BOSS } from "./boss.js";
 import { DURATA_CINEMATICA, SUONI_CINEMATICA } from "./cinematica.js";
+import { creaTabellone } from "./classifica.js";
 import { creaEffetti } from "./effetti.js";
 import { creaRender } from "./render.js";
 import { ALTEZZA, IN, LARGHEZZA, TICK, creaPartita, passo, punteggio, risultato } from "./sim.js";
@@ -18,9 +19,19 @@ const MARKUP = `
     <canvas class="zucco-schermo" width="${LARGHEZZA}" height="${ALTEZZA}" aria-label="La fuga di Zucco"></canvas>
     <div class="zucco-pannello">
       <p class="zucco-esito" hidden></p>
+      <form class="zucco-nome" hidden>
+        <input class="zucco-campo" type="text" placeholder="Il tuo nome" aria-label="Il tuo nome per la classifica" autocomplete="nickname" enterkeyhint="send" spellcheck="false" required />
+        <button class="zucco-salva" type="submit">Salva</button>
+      </form>
+      <div class="zucco-classifica" hidden>
+        <h2>Classifica</h2>
+        <ol class="zucco-elenco" hidden></ol>
+        <p class="zucco-avviso" hidden></p>
+      </div>
       <div class="zucco-azioni">
         <button class="zucco-gioca" type="button">Gioca</button>
         <button class="zucco-suono" type="button" aria-label="Audio" aria-pressed="true">&#9835;</button>
+        <button class="zucco-tabella" type="button" aria-label="Classifica" title="Classifica" aria-expanded="false" hidden>&#9819;</button>
         <button class="zucco-aiuto" type="button" aria-label="Comandi" aria-expanded="false">?</button>
       </div>
       <div class="zucco-comandi" hidden>
@@ -77,8 +88,9 @@ const nuovoSeme = () => crypto.getRandomValues(new Uint32Array(1))[0];
  * `seme`: se il server apre la sessione di gioco, è lui a dare il seed.
  * `alTermine(risultato)`: riceve seed, input e punteggio da mandare al server.
  * `alFotogramma(partita, stato)`: chiamata a ogni fotogramma, per chi vuole seguire la partita da fuori.
+ * `classifica`: `{ leggi, salva }`, vedi classifica.js. Senza, il gioco non propone di salvare il nome.
  */
-export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {}, alFotogramma = () => {} } = {}) {
+export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {}, alFotogramma = () => {}, classifica = null } = {}) {
   radice.classList.add("zucco");
   radice.innerHTML = MARKUP;
 
@@ -100,6 +112,11 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   const effetti = creaEffetti({ scosseAttive: !movimentoRidotto, sprite });
   const render = creaRender(schermo, sprite, effetti);
   const audio = creaAudio({ muto: leggiMuto() });
+  const tabellone = creaTabellone(trova, classifica, {
+    attesa: ATTESA_RIGIOCA,
+    alMostra: () => mostraAiuto(false),
+    dopoSalvato: () => bottone.focus({ preventScroll: true }),
+  });
 
   let s = creaPartita(0);
   let stato = "titolo";
@@ -116,6 +133,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
     bottone.textContent = testoBottone;
     esito.textContent = testoEsito;
     esito.hidden = !testoEsito;
+    pannello.classList.toggle("in-fondo", stato === "fine" && s.vinta);
     pannello.hidden = false;
     bottone.focus({ preventScroll: true });
   }
@@ -137,6 +155,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
     pannello.hidden = true;
     comandi.hidden = true;
     aiuto.setAttribute("aria-expanded", "false");
+    tabellone.chiudi();
   }
 
   function pausa() {
@@ -169,6 +188,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
     const dolci = s.caramelle === 1 ? "1 caramella" : `${s.caramelle} caramelle`;
     const esitoPartita = s.vinta ? "Hai battuto il Padrone delle Mani!" : `Stage ${s.stage}:`;
     mostraPannello("Rigioca", `${nuovoRecord ? "Nuovo record! " : ""}${esitoPartita} ${punti} punti, ${dolci}`);
+    if (nuovoRecord) tabellone.proponi(risultato(s));
     if (!risultatoInviato) alTermine(risultato(s));
     risultatoInviato = false;
   }
@@ -185,18 +205,19 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
     barraTocco.classList.remove("con-mazza");
   }
 
-  function azionePrincipale() {
+  /** `deciso`: arriva dal tasto Rigioca, l'unico che può lasciare un record senza nome. */
+  function azionePrincipale(deciso = false) {
     if (stato === "cinematica" && tempoFilm > 0.6) termina();
     else if (stato === "pausa") riprendi();
     else if (stato === "titolo") inizia();
-    else if (stato === "fine" && performance.now() - fineAlle > ATTESA_RIGIOCA) inizia();
+    else if (stato === "fine" && performance.now() - fineAlle > ATTESA_RIGIOCA && (deciso || !tabellone.inAttesa)) inizia();
   }
 
   const premi = (codice) => {
     if (stato === "gioco") coda.push(codice);
   };
 
-  bottone.addEventListener("click", azionePrincipale);
+  bottone.addEventListener("click", () => azionePrincipale(true));
 
   function alternaSuono() {
     audio.muto = !audio.muto;
@@ -212,6 +233,8 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   const TASTI_MAZZA = new Set(["KeyX", "ArrowRight", "KeyD"]);
 
   function tastoGiu(e) {
+    // Mentre si scrive il nome, M, X, D e lo spazio sono solo lettere.
+    if (e.target instanceof HTMLInputElement) return;
     if (e.code === "Escape" || e.code === "KeyP") {
       if (stato === "gioco") pausa();
       else if (stato === "pausa") riprendi();
@@ -228,7 +251,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
     e.preventDefault();
     if (e.repeat) return;
     if (stato !== "gioco") {
-      if (salto) azionePrincipale();
+      if (salto) azionePrincipale(e.target === bottone);
       return;
     }
     premi(salto ? IN.SALTO_GIU : IN.SCIVOLA_GIU);
@@ -261,6 +284,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   const mostraAiuto = (visibile) => {
     comandi.hidden = !visibile;
     aiuto.setAttribute("aria-expanded", String(visibile));
+    if (visibile) tabellone.nascondi();
   };
   aiuto.addEventListener("click", () => {
     clearTimeout(timerAiuto);

@@ -302,6 +302,95 @@ export function suonaPassoCarnevale(m, c, luna, frase, passo, t, sedicesimo) {
   if (livello >= 8 && battuta === 3 && q >= 12) tamburo(m, t, [190, 150, 120, 95][q - 12]);
 }
 
+// --- Il tema del boss: il motivo della fuga, portato in re minore su un basso che non dà tregua ---
+
+const ACCORDI_BOSS = {
+  Dm: { basso: 38, pad: [62, 65, 69], arpeggio: [74, 77, 81] },
+  Eb: { basso: 39, pad: [63, 67, 70], arpeggio: [75, 79, 82] },
+  Gm: { basso: 43, pad: [62, 67, 70], arpeggio: [74, 79, 82] },
+  A: { basso: 45, pad: [61, 64, 69], arpeggio: [73, 76, 81] },
+  Cdim: { basso: 37, pad: [61, 64, 67], arpeggio: [73, 76, 79] },
+};
+
+export const GIRI_BOSS = { I: ["Dm", "Dm", "Eb", "Cdim"], A: ["Dm", "Eb", "Dm", "Cdim"], B: ["Gm", "Eb", "Dm", "A"] };
+
+// [sedicesimo, nota MIDI, durata in sedicesimi]
+export const MELODIE_BOSS = {
+  A: [
+    [0, 74, 3], [3, 77, 3], [6, 81, 2], [8, 82, 3], [11, 81, 1], [12, 77, 4],
+    [16, 75, 3], [19, 79, 3], [22, 82, 2], [24, 84, 3], [27, 82, 1], [28, 79, 4],
+    [32, 74, 2], [34, 77, 2], [36, 81, 2], [38, 86, 2], [40, 85, 3], [43, 82, 1], [44, 81, 4],
+    [48, 85, 3], [51, 82, 3], [54, 79, 2], [56, 76, 3], [59, 79, 1], [60, 73, 4],
+  ],
+  B: [
+    [0, 79, 2], [2, 82, 2], [4, 86, 2], [6, 82, 2], [8, 91, 4], [12, 90, 2], [14, 86, 2],
+    [16, 79, 2], [18, 82, 2], [20, 87, 2], [22, 82, 2], [24, 91, 4], [28, 89, 2], [30, 87, 2],
+    [32, 86, 3], [35, 81, 3], [38, 77, 2], [40, 74, 3], [43, 77, 1], [44, 81, 4],
+    [48, 85, 2], [50, 88, 2], [52, 85, 2], [54, 81, 2], [56, 85, 2], [58, 88, 2], [60, 93, 4],
+  ],
+};
+
+// La prima frase è l'ingresso e non torna: il giro riparte dalla seconda.
+export const FORMA_BOSS = ["I", "A", "A", "B", "A", "B"];
+export const fraseBossDopo = (i) => (i + 1 < FORMA_BOSS.length ? i + 1 : 1);
+
+export const TEMA_BOSS = [
+  { bpm: 150, titolo: "Si alza il Padrone", nota: "Da 10 a 7 vite: organo, basso che incalza e rintocchi di campana.", arpeggio: false, doppio: false, batteria: 1, sposta: 0 },
+  { bpm: 162, titolo: "Le mani si agitano", nota: "Da 6 a 4 vite: il tema si sdoppia e un arpeggio corre sopra l'organo.", arpeggio: true, doppio: true, batteria: 2, sposta: 0 },
+  { bpm: 174, titolo: "Furia", nota: "Le ultime 3 vite: sale di un semitono, la cassa raddoppia e i tamburi chiudono ogni giro.", arpeggio: true, doppio: true, batteria: 3, sposta: 1 },
+];
+
+export const livelloTemaBoss = (vite) => (vite > 6 ? 0 : vite > 3 ? 1 : 2);
+
+const COLPI_BOSS = [0, 3, 6, 8, 11, 14];
+const INDICE_BOSS = Object.fromEntries(
+  Object.entries(MELODIE_BOSS).map(([nome, note]) => [nome, new Map(note.map(([passo, midi, durata]) => [passo, [midi, durata]]))]),
+);
+
+export function suonaPassoBoss(m, c, frase, passo, t, sedicesimo) {
+  const battuta = Math.floor(passo / 16);
+  const q = passo % 16;
+  const accordo = ACCORDI_BOSS[GIRI_BOSS[frase][battuta]];
+  const nota = (midi) => frequenza(midi + c.sposta);
+
+  // L'organo tiene l'accordo per tutta la battuta.
+  if (q === 0)
+    for (const midi of accordo.pad)
+      for (const stonato of [0, 9])
+        tono(m, { f: nota(midi), t, durata: sedicesimo * 15, forma: "sawtooth", vol: 0.04, attacco: 0.015, rilascio: 0.08, filtro: 1600, stonato });
+
+  // Il basso spinge a gruppi di tre e salta d'ottava prima di ogni ripartenza.
+  if (COLPI_BOSS.includes(q)) {
+    const f = nota(accordo.basso + (q === 6 || q === 14 ? 12 : 0));
+    tono(m, { f, t, durata: sedicesimo * 1.7, vol: 0.2, rilascio: 0.03 });
+    tono(m, { f, t, durata: sedicesimo * 1.5, forma: "impulso", vol: 0.1, rilascio: 0.03, filtro: 1000 });
+  }
+
+  if (q === 0 && battuta % 2 === 0) campana(m, nota(accordo.basso + 36), t, 0.13);
+
+  const voce = INDICE_BOSS[frase]?.get(passo);
+  if (voce) {
+    const durata = voce[1] * sedicesimo * 0.9;
+    tono(m, { f: nota(voce[0]), t, durata, forma: "impulso", vol: 0.17, eco: 0.4 });
+    tono(m, { f: nota(voce[0] - 12), t, durata, forma: "sawtooth", vol: 0.07, filtro: 1400 });
+    if (c.doppio) tono(m, { f: nota(voce[0]), t, durata, forma: "impulso", vol: 0.1, stonato: 14, eco: 0.3 });
+  }
+
+  // L'ingresso è solo organo e basso, e l'ultima battuta si stringe in un rullo.
+  if (frase === "I") {
+    if (q % 8 === 0) cassa(m, t);
+    if (battuta === 3 && (q >= 8 || q % 2 === 0)) rullante(m, t, 0);
+    return;
+  }
+
+  if (c.arpeggio) tono(m, { f: nota(accordo.arpeggio[[0, 1, 2, 1][q % 4]] + 12), t, durata: sedicesimo * 0.7, forma: "impulso", vol: 0.045, rilascio: 0.03, eco: 0.3 });
+
+  if (c.batteria >= 3 ? q % 2 === 0 : COLPI_BOSS.includes(q)) cassa(m, t);
+  if (q === 4 || q === 12) rullante(m, t, 0);
+  if (q % 2 === 0) piatto(m, t, q % 4 === 2, 0);
+  if (c.batteria >= 2 && battuta === 3 && q >= 12) tamburo(m, t, [190, 150, 120, 95][q - 12]);
+}
+
 // --- Gli effetti sonori: brevissimi, e ognuno ha un posto nello spazio ---
 
 const ASCOLTO = 56; // dov'è Zucco: da lì si sente il mondo
@@ -554,8 +643,12 @@ const PASSAGGI = { pipistrello: "pipistrello", fantasma: "fantasma", ragno: "rag
 const STAGE_ORDA = 7;
 const MUSICA_ACCESA = 0.85;
 const MUSICA_ABBASSATA = 0.4;
-const COLPI_FORTI = new Set(["urto", "ko", "demone", "mano", "bossAtterra", "bossColpito", "bossMuore"]);
-const SCENE_SILENZIOSE = new Set(["frenata", "silenzio", "trema", "balzo", "spinta", "presa"]);
+// Il tema del boss non lascia buchi come la marcetta: più basso, e cede di più sotto i colpi.
+const MUSICA_DUELLO = 0.6;
+const DUELLO_ABBASSATO = 0.2;
+const COLPI_FORTI = new Set(["urto", "ko", "demone", "mano", "mazzata", "fuoricampo", "bossAtterra", "bossColpito", "bossMuore"]);
+const SCENE_SILENZIOSE = new Set(["frenata", "silenzio", "trema", "balzo", "spinta", "presa", "morte"]);
+const FASI_TEMA_BOSS = new Set(["apertura", "duello", "morte"]);
 
 /** La musica segue la partita, gli effetti arrivano dagli eventi di sim.js. */
 export function creaAudio({ muto: partenzaMuta = false } = {}) {
@@ -572,19 +665,28 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
   let ultimaCaramella = -1;
   let ruggito = 0;
   let inScena = false;
+  let inDuello = false;
+  let tema = 0;
+  let temaVoluto = 0;
 
   const volume = () => (muto ? 0 : 0.62);
 
   function pianifica() {
-    const c = STAGE[Math.min(stage, STAGE.length) - 1];
+    let c = inDuello ? TEMA_BOSS[tema] : STAGE[Math.min(stage, STAGE.length) - 1];
     while (prossimo < ctx.currentTime + 0.14) {
       const sedicesimo = 60 / (c.bpm * (luna ? FATTORE_LUNA : 1)) / 4;
-      suonaPassoCarnevale(m, c, luna, FORMA[frase], passo, prossimo, sedicesimo);
+      if (inDuello) suonaPassoBoss(m, c, FORMA_BOSS[frase], passo, prossimo, sedicesimo);
+      else suonaPassoCarnevale(m, c, luna, FORMA[frase], passo, prossimo, sedicesimo);
       prossimo += sedicesimo;
       passo++;
       if (passo === 64) {
         passo = 0;
-        frase = (frase + 1) % FORMA.length;
+        frase = inDuello ? fraseBossDopo(frase) : (frase + 1) % FORMA.length;
+        // La furia del boss cambia a fine frase: a metà sarebbe uno strappo.
+        if (inDuello) {
+          tema = temaVoluto;
+          c = TEMA_BOSS[tema];
+        }
       }
     }
     m.eco.delayTime.setTargetAtTime((60 / c.bpm) * 0.75, ctx.currentTime, 0.05);
@@ -611,6 +713,7 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
       stage = 1;
       luna = false;
       inScena = false;
+      inDuello = false;
       frase = 0;
       passo = 0;
       prossimo = ctx.currentTime + 0.08;
@@ -627,19 +730,32 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
       } else if (tipo === "sfiora") suona(m, PASSAGGI[ostacolo] ?? "sfiora", x, t);
       else if (SUONI[tipo]) suona(m, tipo, x, t);
       if (COLPI_FORTI.has(tipo) && !inScena) {
-        m.musica.gain.setTargetAtTime(MUSICA_ABBASSATA, t, 0.008);
-        m.musica.gain.setTargetAtTime(MUSICA_ACCESA, t + 0.09, 0.12);
+        m.musica.gain.setTargetAtTime(inDuello ? DUELLO_ABBASSATO : MUSICA_ABBASSATA, t, 0.008);
+        m.musica.gain.setTargetAtTime(inDuello ? MUSICA_DUELLO : MUSICA_ACCESA, t + 0.09, 0.12);
       }
     },
 
     aggiorna(s) {
       stage = s.stage;
       luna = s.lunaT > 0;
-      // Zucco rallenta e la musica si spegne piano: il silenzio prepara il terremoto. Torna col duello.
-      const scena = SCENE_SILENZIOSE.has(s.boss?.fase);
+      // Zucco rallenta e la musica si spegne piano: il silenzio prepara il terremoto.
+      // Col duello riattacca di colpo, e quando il boss muore sparisce per lasciare tutto all'esplosione.
+      const fase = s.boss?.fase;
+      const duello = FASI_TEMA_BOSS.has(fase);
+      if (m && orologio && duello !== inDuello) {
+        inDuello = duello;
+        tema = 0;
+        frase = 0;
+        passo = 0;
+        prossimo = ctx.currentTime + 0.05;
+      }
+      if (s.boss) temaVoluto = livelloTemaBoss(s.boss.vite);
+      const scena = SCENE_SILENZIOSE.has(fase);
       if (m && orologio && scena !== inScena) {
         inScena = scena;
-        m.musica.gain.setTargetAtTime(scena ? 0 : MUSICA_ACCESA, ctx.currentTime, scena ? 1.8 : 0.3);
+        const piena = inDuello ? MUSICA_DUELLO : MUSICA_ACCESA;
+        m.musica.gain.cancelScheduledValues(ctx.currentTime);
+        m.musica.gain.setTargetAtTime(scena ? 0 : piena, ctx.currentTime, !scena ? 0.08 : fase === "morte" ? 0.12 : 1.8);
       }
       if (!m || !orologio || s.boss || stage < STAGE_ORDA || ctx.currentTime < ruggito) return;
       ruggito = ctx.currentTime + 1.2 + Math.random() * 2.2;
@@ -662,6 +778,10 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
       stage = 1;
       luna = false;
       inScena = false;
+      inDuello = false;
+      frase = 0;
+      passo = 0;
+      prossimo = ctx.currentTime + 0.05;
       m.musica.gain.cancelScheduledValues(ctx.currentTime);
       m.musica.gain.setTargetAtTime(0.5, ctx.currentTime, 0.5);
     },
