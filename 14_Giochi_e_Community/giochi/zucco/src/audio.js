@@ -340,7 +340,6 @@ export const TEMA_BOSS = [
   { bpm: 174, titolo: "Furia", nota: "Le ultime 3 vite: sale di un semitono, la cassa raddoppia e i tamburi chiudono ogni giro.", arpeggio: true, doppio: true, batteria: 3, sposta: 1 },
 ];
 
-export const livelloTemaBoss = (vite) => (vite > 6 ? 0 : vite > 3 ? 1 : 2);
 
 const COLPI_BOSS = [0, 3, 6, 8, 11, 14];
 const INDICE_BOSS = Object.fromEntries(
@@ -458,6 +457,7 @@ function briciole(m, d, t, quante, vol) {
 }
 
 const SCALA_CARAMELLE = [0, 2, 4, 7, 9, 12];
+const SCALA_ROTTI = [0, 2, 4, 7, 9, 12, 14, 16];
 
 export const SUONI = {
   salto(m, d, t) {
@@ -476,16 +476,26 @@ export const SUONI = {
     battito(m, d, { forma: "triangle", f, t, durata: 0.06, vol: 0.14 });
     battito(m, d, { forma: "triangle", f: f * 1.5, t: t + 0.045, durata: 0.07, vol: 0.11 });
   },
-  rotto(m, d, t) {
-    soffio(m, d, { t, durata: 0.06, vol: 0.26, tipo: "highpass", f: 1200 });
-    soffio(m, d, { t, durata: 0.12, vol: 0.24, f: 500 });
-    battito(m, d, { f: 180, fine: 70, t, durata: 0.09, vol: 0.24 });
-    briciole(m, d, t, 3, 0.1);
+  // Con la luna piena Zucco è invincibile: non si sente un urto ma uno sfondamento, una scarica che cade
+  // di colpo e due rintocchi limpidi. Ogni mostro di fila li alza di una nota.
+  rotto(m, d, t, nota = 0) {
+    const f = 523 * 2 ** (SCALA_ROTTI[nota % SCALA_ROTTI.length] / 12);
+    battito(m, d, { forma: "square", f: f * 2, fine: f / 4, t, durata: 0.09, vol: 0.2, filtro: 6000 });
+    battito(m, d, { f: 170, fine: 60, t, durata: 0.1, vol: 0.38 });
+    soffio(m, d, { t, durata: 0.04, vol: 0.3, tipo: "highpass", f: 3200 });
+    battito(m, d, { forma: "triangle", f: f * 2, t: t + 0.05, durata: 0.09, vol: 0.2 });
+    battito(m, d, { forma: "triangle", f: f * 3, t: t + 0.1, durata: 0.16, vol: 0.18 });
   },
   urto(m, d, t) {
     battito(m, d, { f: 160, fine: 40, t, durata: 0.26, vol: 0.42 });
     soffio(m, d, { t, durata: 0.28, vol: 0.3, tipo: "lowpass", f: 1800, fine: 300 });
     soffio(m, d, { t, durata: 0.03, vol: 0.22, tipo: "highpass", f: 2500 });
+  },
+  // Un quarto di vita: si sente che ha fatto male, ma non è un'esplosione.
+  botta(m, d, t) {
+    battito(m, d, { f: 210, fine: 90, t, durata: 0.1, vol: 0.34 });
+    soffio(m, d, { t, durata: 0.07, vol: 0.26, tipo: "lowpass", f: 1400 });
+    soffio(m, d, { t, durata: 0.02, vol: 0.18, tipo: "highpass", f: 2800 });
   },
   ko(m, d, t) {
     soffio(m, d, { t, durata: 0.12, vol: 0.34, f: 700 });
@@ -578,8 +588,10 @@ export const SUONI = {
     battito(m, d, { forma: "triangle", f: 523, t, durata: 0.07, vol: 0.14 });
     battito(m, d, { forma: "triangle", f: 784, t: t + 0.07, durata: 0.11, vol: 0.14 });
   },
+  // Il gesto si sente in due tempi: la carica appena accennata, poi il fendente.
   colpoAria(m, d, t) {
-    soffio(m, d, { t, durata: 0.1, vol: 0.14, f: 700, fine: 2600, q: 2 });
+    soffio(m, d, { t, durata: 0.05, vol: 0.3, f: 380, fine: 800, q: 1 });
+    soffio(m, d, { t: t + 0.03, durata: 0.11, vol: 1, f: 800, fine: 3600, q: 0.8 });
   },
   lancio(m, d, t) {
     soffio(m, d, { t, durata: 0.14, vol: 0.14, f: 900, fine: 300, q: 2 });
@@ -597,6 +609,85 @@ export const SUONI = {
   bossColpito(m, d, t) {
     SUONI.urto(m, d, t);
     battito(m, d, { forma: "sawtooth", f: 120, fine: 60, t: t + 0.04, durata: 0.26, vol: 0.14, filtro: 800 });
+  },
+  bossCura(m, d, t) {
+    battito(m, d, { forma: "sawtooth", f: 55, fine: 130, t, durata: 0.42, vol: 0.4, filtro: 900 });
+    battito(m, d, { forma: "triangle", f: 220, fine: 330, t, durata: 0.3, vol: 0.26 });
+    soffio(m, d, { t, durata: 0.4, vol: 0.3, f: 300, fine: 1200, q: 2 });
+  },
+  // Il ruggito è un ringhio fatto di colpi fitti: sale, si spezza e crolla, con il terreno che risponde.
+  faseBoss(m, d, t) {
+    const colpi = 26;
+    for (let i = 0; i < colpi; i++) {
+      const k = i / (colpi - 1);
+      const arco = Math.sin(Math.PI * Math.min(1, k * 1.2));
+      const f = 72 + 130 * arco;
+      battito(m, d, { forma: "sawtooth", f, fine: f * 0.72, t: t + i * 0.05, durata: 0.075, vol: 0.2 + 0.4 * arco, filtro: 800 + 1800 * arco });
+    }
+    battito(m, d, { f: 62, fine: 26, t, durata: 1.2, vol: 0.6 });
+    soffio(m, d, { t, durata: 1.15, vol: 0.55, f: 420, fine: 1500, q: 0.8 });
+    soffio(m, d, { t: t + 0.05, durata: 1.2, vol: 0.4, tipo: "lowpass", f: 280 });
+    briciole(m, d, t + 0.1, 8, 0.1);
+  },
+  // Quello che succede dietro il boss sta sotto a tutto il resto, ma si deve sentire.
+  versaBoccia(m, d, t) {
+    soffio(m, d, { t, durata: 0.9, vol: 0.6, f: 800, fine: 1900, q: 1.5 });
+  },
+  mescola(m, d, t) {
+    [0, 0.16, 0.34].forEach((ritardo) => battito(m, d, { forma: "triangle", f: 2100, fine: 1700, t: t + ritardo, durata: 0.04, vol: 0.36 }));
+    soffio(m, d, { t, durata: 0.5, vol: 0.4, f: 500, fine: 800, q: 1.5 });
+  },
+  angeloPorta(m, d, t) {
+    battito(m, d, { f: 2400, t, durata: 0.12, vol: 0.4 });
+    battito(m, d, { f: 3600, t, durata: 0.07, vol: 0.22 });
+    soffio(m, d, { t: t + 0.1, durata: 0.7, vol: 0.5, f: 900, fine: 1800, q: 1.5 });
+  },
+  angeloBeve(m, d, t) {
+    [0, 0.34, 0.68, 1.02].forEach((ritardo) => {
+      battito(m, d, { forma: "triangle", f: 150, fine: 320, t: t + ritardo, durata: 0.2, vol: 0.7 });
+      soffio(m, d, { t: t + ritardo, durata: 0.14, vol: 0.3, tipo: "lowpass", f: 500 });
+    });
+  },
+  // Il boss ha bevuto: un sospiro cupo che si apre in un accordo freddo.
+  angeloAzzurro(m, d, t) {
+    battito(m, d, { forma: "sawtooth", f: 55, fine: 165, t, durata: 0.6, vol: 0.34, filtro: 1000 });
+    [659, 784, 988, 1319].forEach((f, i) => battito(m, d, { forma: "triangle", f, t: t + 0.12 + i * 0.07, durata: 0.28, vol: 0.2 }));
+    soffio(m, d, { t, durata: 0.5, vol: 0.2, tipo: "highpass", f: 2500, fine: 7000 });
+  },
+  // Cinque scricchiolii sempre più fitti e più acuti: la mano si tende sul bordo.
+  manataAvviso(m, d, t) {
+    battito(m, d, { forma: "sawtooth", f: 58, fine: 116, t, durata: 0.75, vol: 0.4, filtro: 600 });
+    [0, 0.26, 0.46, 0.6, 0.7].forEach((ritardo, i) => {
+      soffio(m, d, { t: t + ritardo, durata: 0.06, vol: 0.6, f: 700 + i * 260, q: 2 });
+      battito(m, d, { forma: "square", f: 180 + i * 50, t: t + ritardo, durata: 0.03, vol: 0.2, filtro: 1500 });
+    });
+  },
+  // Il passaggio è fatto di quattro soffi in posti diversi: vedi evento(), si sente da destra a sinistra.
+  manata(m, d, t, passaggio = 0) {
+    soffio(m, d, { t, durata: 0.16, vol: 0.4, f: 900 - passaggio * 130, fine: 240, q: 1.2 });
+    if (passaggio === 0) battito(m, d, { f: 120, fine: 50, t, durata: 0.14, vol: 0.34 });
+  },
+  manataTorna(m, d, t) {
+    soffio(m, d, { t, durata: 0.5, vol: 0.2, f: 260, fine: 700, q: 1.5 });
+  },
+  // Elef è l'unico suono allegro del duello: va riconosciuto anche senza guardare il tetto.
+  elef(m, d, t) {
+    [784, 1047, 1319].forEach((f, i) => battito(m, d, { forma: "triangle", f, t: t + i * 0.06, durata: 0.08, vol: 0.34 }));
+  },
+  lanciaVita(m, d, t) {
+    soffio(m, d, { t, durata: 0.16, vol: 0.34, f: 500, fine: 1900, q: 1.5 });
+    battito(m, d, { forma: "triangle", f: 420, fine: 1100, t, durata: 0.18, vol: 0.3 });
+  },
+  vitaAtterra(m, d, t) {
+    battito(m, d, { forma: "triangle", f: 1175, fine: 880, t, durata: 0.07, vol: 0.3 });
+    battito(m, d, { f: 240, fine: 150, t, durata: 0.05, vol: 0.3 });
+  },
+  vitaPresa(m, d, t) {
+    [523, 659, 784, 1047].forEach((f, i) => battito(m, d, { forma: "triangle", f, t: t + i * 0.055, durata: i === 3 ? 0.2 : 0.07, vol: 0.32 }));
+  },
+  vitaSvanita(m, d, t) {
+    battito(m, d, { forma: "triangle", f: 660, fine: 180, t, durata: 0.2, vol: 0.22 });
+    soffio(m, d, { t, durata: 0.14, vol: 0.2, f: 1500, fine: 400, q: 1.5 });
   },
   bossMuore(m, d, t) {
     battito(m, d, { f: 110, fine: 24, t, durata: 0.9, vol: 0.6 });
@@ -646,7 +737,16 @@ const MUSICA_ABBASSATA = 0.4;
 // Il tema del boss non lascia buchi come la marcetta: più basso, e cede di più sotto i colpi.
 const MUSICA_DUELLO = 0.6;
 const DUELLO_ABBASSATO = 0.2;
-const COLPI_FORTI = new Set(["urto", "ko", "demone", "mano", "mazzata", "fuoricampo", "bossAtterra", "bossColpito", "bossMuore"]);
+const COLPI_FORTI = new Set(["urto", "botta", "ko", "demone", "mano", "rotto", "mazzata", "fuoricampo", "bossAtterra", "bossColpito", "bossMuore", "bossCura", "faseBoss", "manata", "manataAvviso", "angeloBeve", "angeloAzzurro"]);
+// Da dove passa la manata e quanto ci mette: va da destra a sinistra in meno di mezzo secondo.
+const TAPPE_MANATA = [300, 190, 80, -30];
+const PASSO_MANATA = 0.11;
+const FILA_ROTTI = 2.5;
+const TENUTA_COLPO = 0.09;
+const TENUTE = { faseBoss: 1.15, angeloBeve: 1.4 };
+const X_BOCCIA = 372;
+const PAUSA_VERSA = 3;
+const PAUSA_MESCOLA = 1.4;
 const SCENE_SILENZIOSE = new Set(["frenata", "silenzio", "trema", "balzo", "spinta", "presa", "morte"]);
 const FASI_TEMA_BOSS = new Set(["apertura", "duello", "morte"]);
 
@@ -663,6 +763,9 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
   let orologio = 0;
   let caramelle = 0;
   let ultimaCaramella = -1;
+  let rotti = 0;
+  let ultimoRotto = -FILA_ROTTI;
+  let prossimoDrink = 0;
   let ruggito = 0;
   let inScena = false;
   let inDuello = false;
@@ -727,11 +830,16 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
         caramelle = t - ultimaCaramella < 0.6 ? caramelle + 1 : 0;
         ultimaCaramella = t;
         suona(m, "caramella", x, t, caramelle);
-      } else if (tipo === "sfiora") suona(m, PASSAGGI[ostacolo] ?? "sfiora", x, t);
+      } else if (tipo === "rotto") {
+        rotti = t - ultimoRotto < FILA_ROTTI ? rotti + 1 : 0;
+        ultimoRotto = t;
+        suona(m, "rotto", x, t, rotti);
+      } else if (tipo === "manata") TAPPE_MANATA.forEach((dove, i) => suona(m, "manata", dove, t + i * PASSO_MANATA, i));
+      else if (tipo === "sfiora") suona(m, PASSAGGI[ostacolo] ?? "sfiora", x, t);
       else if (SUONI[tipo]) suona(m, tipo, x, t);
       if (COLPI_FORTI.has(tipo) && !inScena) {
         m.musica.gain.setTargetAtTime(inDuello ? DUELLO_ABBASSATO : MUSICA_ABBASSATA, t, 0.008);
-        m.musica.gain.setTargetAtTime(inDuello ? MUSICA_DUELLO : MUSICA_ACCESA, t + 0.09, 0.12);
+        m.musica.gain.setTargetAtTime(inDuello ? MUSICA_DUELLO : MUSICA_ACCESA, t + (TENUTE[tipo] ?? TENUTA_COLPO), 0.12);
       }
     },
 
@@ -749,13 +857,19 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
         passo = 0;
         prossimo = ctx.currentTime + 0.05;
       }
-      if (s.boss) temaVoluto = livelloTemaBoss(s.boss.vite);
+      if (s.boss) temaVoluto = s.boss.livello;
       const scena = SCENE_SILENZIOSE.has(fase);
       if (m && orologio && scena !== inScena) {
         inScena = scena;
         const piena = inDuello ? MUSICA_DUELLO : MUSICA_ACCESA;
         m.musica.gain.cancelScheduledValues(ctx.currentTime);
         m.musica.gain.setTargetAtTime(scena ? 0 : piena, ctx.currentTime, !scena ? 0.08 : fase === "morte" ? 0.12 : 1.8);
+      }
+      // Dietro il boss si lavora al drink: si sente dal lato destro, sotto a tutto il resto.
+      const b = s.boss;
+      if (m && orologio && fase === "duello" && b.livello < 2 && ctx.currentTime >= prossimoDrink) {
+        prossimoDrink = ctx.currentTime + (b.livello === 0 ? PAUSA_VERSA : PAUSA_MESCOLA);
+        suona(m, b.livello === 0 ? "versaBoccia" : "mescola", X_BOCCIA, ctx.currentTime);
       }
       if (!m || !orologio || s.boss || stage < STAGE_ORDA || ctx.currentTime < ruggito) return;
       ruggito = ctx.currentTime + 1.2 + Math.random() * 2.2;

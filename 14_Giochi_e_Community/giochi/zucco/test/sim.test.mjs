@@ -17,8 +17,8 @@ import {
   risultato,
   scatolaOstacolo,
 } from "../src/sim.js";
-import { FORMA_BOSS, GIRI_BOSS, MELODIE_BOSS, TEMA_BOSS, fraseBossDopo, livelloTemaBoss } from "../src/audio.js";
-import { CORSIE, PIATTAFORME, TEMPO_BOSS, VITE_BOSS } from "../src/boss.js";
+import { FORMA_BOSS, GIRI_BOSS, MELODIE_BOSS, TEMA_BOSS, fraseBossDopo } from "../src/audio.js";
+import { CORSIE, DURATA_RUGGITO, DURATA_VITA, HOMERUN_PER_PIPISTRELLO, PIATTAFORME, TEMPI_ANGELO, TEMPO_BOSS, VITE_BOSS, VOLO_VITA, faseDaVite } from "../src/boss.js";
 import { PUNTI_TRE_LUNE } from "../src/punti.js";
 
 const MINUTI = 60 * 60;
@@ -191,8 +191,11 @@ test("ogni ostacolo sfiora Zucco una volta sola, alle sue spalle", () => {
   assert.ok(passaggi[0].x < X_ZUCCO);
 });
 
-/** Giocatore automatico del duello: va sulla corsia del lancio più vicino e colpisce quando arriva a tiro. */
-function creaBotDuello({ sbaglia = 0, seed = 1 } = {}) {
+/**
+ * Giocatore automatico del duello: va sulla corsia del lancio più vicino e colpisce quando arriva a tiro.
+ * Prima di tutto toglie Zucco dalla corsia della manata. `distratto`: quante manate non vede.
+ */
+function creaBotDuello({ sbaglia = 0, distratto = 0, seed = 1 } = {}) {
   let a = seed * 2654435761;
   const caso = () => {
     a = (Math.imul(a ^ (a >>> 15), 2246822519) + 1) >>> 0;
@@ -211,11 +214,18 @@ function creaBotDuello({ sbaglia = 0, seed = 1 } = {}) {
     const z = s.zucco;
     const pericoli = b.proiettili.filter((p) => p.stato === "vola").sort((p, q) => p.x - q.x);
     const p = pericoli[0];
-    const mira = p?.y ?? (b.carica ? CORSIE[b.carica.corsia] : null);
-    if (mira === null) return comandi;
     if (p && !visti.has(p)) visti.set(p, caso() < sbaglia);
-
     const qui = z.y - 14;
+
+    let mira = p?.y ?? (b.carica ? CORSIE[b.carica.corsia] : null);
+    for (const m of b.manate) if (!visti.has(m)) visti.set(m, caso() < distratto);
+    const occupate = b.manate.filter((m) => !visti.get(m)).map((m) => CORSIE[m.corsia]);
+    if (occupate.some((y) => Math.abs(qui - y) < 20)) {
+      const libere = CORSIE.filter((y) => !occupate.includes(y));
+      mira = libere.sort((p, q) => Math.abs(p - qui) - Math.abs(q - qui))[0];
+    } else if (mira !== null && occupate.some((y) => Math.abs(mira - y) < 6)) mira = null;
+    if (mira === null) return comandi;
+
     const fermo = z.vy === 0;
     if (fermo && mira < qui - 6 && salto === 0) {
       comandi.push(IN.SALTO_GIU);
@@ -317,8 +327,42 @@ function inDuello(seed = 1) {
     passo(s);
   }
   s.boss.prossimoLancio = 999;
+  s.boss.prossimoElef = 999;
   s.graziaT = 0;
   return { s, eventi };
+}
+
+/** Il boss perde vite a colpi di pipistrello: è l'unico modo di farlo cambiare fase. */
+function pipistrelloSulBoss(s) {
+  s.boss.proiettili.push({ ...lanciato("pipistrello", 225, 1), stato: "ritorno", vx: 520 });
+  while (s.boss.proiettili.length) {
+    s.graziaT = 1;
+    passo(s);
+  }
+}
+
+function finoAVite(s, vite) {
+  while (s.boss.vite > vite) pipistrelloSulBoss(s);
+}
+
+/** Lascia finire il ruggito, così il boss torna ad attaccare. */
+function dopoIlRuggito(s) {
+  while (s.boss.ruggito > 0 || s.boss.angelo) {
+    s.graziaT = 1;
+    passo(s);
+  }
+}
+
+/** Porta il boss in seconda fase e fa partire una manata su `corsia`. */
+function manataSu(s, corsia) {
+  finoAVite(s, 6);
+  dopoIlRuggito(s);
+  s.boss.prossimaManata = 0;
+  s.zucco.y = PIATTAFORME[0];
+  s.graziaT = 1;
+  passo(s);
+  s.boss.manate[0].corsia = corsia;
+  return s.boss.manate[0];
 }
 
 const lanciato = (tipo, x, corsia = 0) => ({ tipo, x, y: CORSIE[corsia], vx: -200, vy: 0, stato: "vola", fase: 0 });
@@ -333,22 +377,515 @@ test("un pipistrello colpito torna indietro ed esplode sul boss", () => {
   assert.ok(eventi.some((e) => e.tipo === "bossColpito"));
 });
 
-test("tutto il resto vola fuori con HOMERUUUNNN!!! e non fa male al boss", () => {
+test("tutto il resto vola fuori con HOMERUUUNNN!!!, dà punti e alza il moltiplicatore, ma non fa male al boss", () => {
   for (const tipo of ["osso", "teschio", "zucca"]) {
     const { s } = inDuello();
+    s.moltiplicatore = 1.5;
+    const prima = s.punti;
     s.boss.proiettili.push(lanciato(tipo, X_ZUCCO + 30));
     passo(s, [IN.MAZZA]);
     assert.equal(s.boss.scritta.testo, "HOMERUUUNNN!!!");
+    assert.ok(Math.abs(s.punti - prima - 150) < 1e-6, "i punti valgono col moltiplicatore di prima");
+    assert.equal(s.moltiplicatore, 1.6);
     while (s.boss.proiettili.length) passo(s);
     assert.equal(s.boss.vite, VITE_BOSS);
   }
 });
 
-test("un lancio non colpito toglie una vita a Zucco", () => {
+/** Il prossimo lancio del boss, appena preso in mano. */
+function prossimoLancio(s) {
+  s.boss.prossimoLancio = 0;
+  while (!s.boss.carica) passo(s);
+  const { tipo, corsia } = s.boss.carica;
+  s.boss.carica = null;
+  s.boss.prossimoLancio = 999;
+  return { tipo, corsia };
+}
+
+test("i pipistrelli arrivano solo dopo due homerun", () => {
   const { s } = inDuello();
+  for (let i = 0; i < 40; i++) assert.notEqual(prossimoLancio(s).tipo, "pipistrello");
+
+  for (let fatti = 1; fatti <= HOMERUN_PER_PIPISTRELLO; fatti++) {
+    s.boss.proiettili.push(lanciato("osso", X_ZUCCO + 30));
+    s.zucco.ricarica = 0;
+    passo(s, [IN.MAZZA]);
+    assert.equal(s.boss.homerun, fatti);
+    while (s.boss.proiettili.length) passo(s);
+  }
+  const { tipo, corsia } = prossimoLancio(s);
+  assert.equal(tipo, "pipistrello");
+  assert.ok(corsia >= 1, "resta all'altezza delle piattaforme");
+});
+
+test("un pipistrello mancato ne porta un altro, uno ribattuto rimette a zero il conto", () => {
+  const { s } = inDuello();
+  s.boss.homerun = HOMERUN_PER_PIPISTRELLO;
+  for (let i = 0; i < 10; i++) assert.equal(prossimoLancio(s).tipo, "pipistrello", "finché non torna indietro");
+  s.boss.proiettili.push(lanciato("pipistrello", X_ZUCCO + 30));
+  passo(s, [IN.MAZZA]);
+  assert.equal(s.boss.homerun, 0);
+  assert.notEqual(prossimoLancio(s).tipo, "pipistrello");
+});
+
+test("chi resta a terra a fare homerun non accumula punti senza fine: arrivati a due, ci sono solo pipistrelli", () => {
+  const { s } = inDuello();
+  s.boss.prossimoLancio = 0;
+  let fatti = 0;
+  while (s.t < TEMPO_BOSS + 180) {
+    s.graziaT = 1;
+    const p = s.boss.proiettili.find((q) => q.stato === "vola" && q.tipo !== "pipistrello" && q.y === CORSIE[0] && q.x < X_ZUCCO + 40 && q.x > X_ZUCCO + 8);
+    const prima = s.boss.homerun;
+    passo(s, p ? [IN.MAZZA] : []);
+    if (s.boss.homerun > prima) fatti++;
+  }
+  assert.equal(fatti, HOMERUN_PER_PIPISTRELLO);
+  assert.ok(s.moltiplicatore < 1.5, `${s.moltiplicatore}`);
+});
+
+test("un lancio non colpito toglie un quarto di vita, e il moltiplicatore cala in proporzione", () => {
+  const { s } = inDuello();
+  s.moltiplicatore = 1.5;
   s.boss.proiettili.push(lanciato("osso", X_ZUCCO + 20));
   for (let i = 0; i < 20; i++) passo(s);
-  assert.equal(s.vite, VITE - 1);
+  assert.equal(s.vite, VITE - 0.25);
+  assert.ok(Math.abs(s.moltiplicatore - 1.43) < 0.011, `${s.moltiplicatore}`);
+});
+
+test("con 12 lanci addosso Zucco cade, non prima", () => {
+  const { s } = inDuello();
+  for (let i = 1; i <= 12; i++) {
+    s.graziaT = 0;
+    assert.equal(s.finita, false);
+    s.boss.proiettili.push(lanciato("osso", X_ZUCCO + 8));
+    for (let j = 0; j < 3; j++) passo(s);
+    assert.equal(s.vite, VITE - i * 0.25);
+  }
+  assert.equal(s.finita, true);
+  assert.equal(s.zucco.stato, "ko");
+});
+
+test("quando Zucco viene colpito il boss recupera una vita, mai oltre il massimo", () => {
+  const { s, eventi } = inDuello();
+  s.boss.vite = 4;
+  s.boss.proiettili.push(lanciato("osso", X_ZUCCO + 8));
+  for (let i = 0; i < 3; i++) passo(s);
+  assert.equal(s.boss.vite, 5);
+  assert.ok(eventi.some((e) => e.tipo === "bossCura"));
+
+  s.boss.vite = VITE_BOSS;
+  s.graziaT = 0;
+  s.boss.proiettili.push(lanciato("osso", X_ZUCCO + 8));
+  for (let i = 0; i < 3; i++) passo(s);
+  assert.equal(s.boss.vite, VITE_BOSS);
+});
+
+test("la mazza colpisce da subito, si ferma sul contatto e finisce il gesto", () => {
+  const { s } = inDuello();
+  s.boss.proiettili.push(lanciato("pipistrello", X_ZUCCO + 30, 0));
+  passo(s, [IN.MAZZA]);
+  assert.equal(s.boss.proiettili[0].stato, "ritorno");
+  assert.ok(s.boss.fermo > 0, "il fermo sul colpo");
+  const x = s.boss.proiettili[0].x;
+  const posa = s.zucco.swing;
+  passo(s);
+  assert.equal(s.boss.proiettili[0].x, x, "durante il fermo non si muove niente");
+  assert.equal(s.zucco.swing, posa);
+  while (s.boss.fermo > 0) passo(s);
+  for (let i = 0; i < 4; i++) passo(s);
+  assert.ok(s.zucco.swing > 0 && s.zucco.swing < posa, "dopo il contatto il gesto continua");
+});
+
+test("uno swing prende tutto quello che ha a tiro", () => {
+  const { s } = inDuello();
+  s.boss.proiettili.push(lanciato("pipistrello", X_ZUCCO + 20), lanciato("osso", X_ZUCCO + 34));
+  passo(s, [IN.MAZZA]);
+  assert.deepEqual(s.boss.proiettili.map((p) => p.stato), ["ritorno", "fuori"]);
+});
+
+test("il tasto premuto a fine ricarica non si perde", () => {
+  const { s, eventi } = inDuello();
+  const colpi = () => eventi.filter((e) => e.tipo === "colpoAria").length;
+  passo(s, [IN.MAZZA]);
+  for (let i = 0; i < 12; i++) passo(s);
+  passo(s, [IN.MAZZA]);
+  assert.equal(colpi(), 1);
+  for (let i = 0; i < 8; i++) passo(s);
+  assert.equal(colpi(), 2);
+});
+
+test("le fasi salgono con le vite perse e non tornano indietro se il boss si cura", () => {
+  const { s, eventi } = inDuello();
+  finoAVite(s, 7);
+  assert.equal(s.boss.livello, 0);
+  finoAVite(s, 6);
+  assert.equal(s.boss.livello, 1);
+  s.boss.vite = 8;
+  s.graziaT = 0;
+  s.boss.proiettili.push(lanciato("osso", X_ZUCCO + 8));
+  for (let i = 0; i < 3; i++) passo(s);
+  assert.equal(s.boss.livello, 1);
+  finoAVite(s, 3);
+  assert.equal(s.boss.livello, 2);
+  assert.equal(eventi.filter((e) => e.tipo === "faseBoss").length, 2);
+});
+
+test("a ogni cambio di fase il boss ruggisce e smette di attaccare, senza nessun titolo", () => {
+  const { s, eventi } = inDuello();
+  finoAVite(s, 6);
+  assert.ok(s.boss.ruggito > 0);
+  assert.equal(s.boss.scritta, null);
+  assert.equal(eventi.filter((e) => e.tipo === "faseBoss").length, 1);
+  s.boss.prossimoLancio = 0;
+  s.boss.prossimaManata = 0;
+  while (s.boss.ruggito > 0) {
+    assert.equal(s.boss.carica, null);
+    assert.equal(s.boss.manate.length, 0);
+    s.graziaT = 1;
+    passo(s);
+  }
+  passo(s);
+  assert.ok(s.boss.carica, "finito il ruggito riprende a lanciare");
+});
+
+test("il ruggito dura quanto deve", () => {
+  const { s } = inDuello();
+  finoAVite(s, 6);
+  const inizio = s.t;
+  while (s.boss.ruggito > 0) {
+    s.graziaT = 1;
+    passo(s);
+  }
+  assert.ok(s.t - inizio <= DURATA_RUGGITO + 0.1);
+});
+
+test("in prima fase niente manate, dalla seconda sì", () => {
+  const { s } = inDuello();
+  for (let i = 0; i < 60 * 30; i++) {
+    s.graziaT = 1;
+    passo(s);
+    assert.equal(s.boss.manate.length, 0);
+  }
+  finoAVite(s, 6);
+  for (let i = 0; i < 60 * 12 && !s.boss.manate.length; i++) {
+    s.graziaT = 1;
+    passo(s);
+  }
+  assert.ok(s.boss.manate.length, "la seconda fase deve attaccare con le mani");
+});
+
+/** Conta le manate per qualche minuto: quante, quante doppie, e ogni quanto. */
+function contaManate(s, minuti = 5) {
+  let gruppi = 0, doppie = 0, ultima = 0;
+  const pause = [];
+  const fine = s.t + minuti * 60;
+  while (s.t < fine) {
+    s.graziaT = 1;
+    const prima = s.boss.manate.length;
+    passo(s);
+    if (prima === 0 && s.boss.manate.length) {
+      gruppi++;
+      if (s.boss.manate.length === 2) {
+        doppie++;
+        assert.notEqual(s.boss.manate[0].corsia, s.boss.manate[1].corsia);
+      }
+      if (ultima) pause.push(s.t - ultima);
+      ultima = s.t;
+    }
+  }
+  return { gruppi, doppie, pausa: mediana(pause) };
+}
+
+test("in terza fase le manate sono più fitte e ogni tanto sono due, su corsie diverse", () => {
+  const seconda = inDuello(4).s;
+  finoAVite(seconda, 6);
+  dopoIlRuggito(seconda);
+  const terza = inDuello(4).s;
+  finoAVite(terza, 3);
+  dopoIlRuggito(terza);
+
+  const a = contaManate(seconda);
+  const b = contaManate(terza);
+  assert.equal(a.doppie, 0, "le doppie sono solo della terza fase");
+  assert.ok(b.doppie >= 3, `${b.doppie} doppie su ${b.gruppi}`);
+  assert.ok(b.doppie < b.gruppi * 0.7, "ogni tanto, non sempre");
+  assert.ok(b.pausa < a.pausa - 1, `${a.pausa.toFixed(1)} s contro ${b.pausa.toFixed(1)} s`);
+});
+
+test("con due manate una corsia resta libera e Zucco lì non viene toccato", () => {
+  const { s } = inDuello(4);
+  finoAVite(s, 3);
+  dopoIlRuggito(s);
+  s.boss.manate = [0, 2].map((corsia) => ({ corsia, stato: "avviso", t: 0, durata: 0.8, x: 410 }));
+  s.zucco.y = PIATTAFORME[0];
+  s.zucco.vy = 0;
+  s.graziaT = 0;
+  const vite = s.vite;
+  while (s.boss.manate.length) passo(s);
+  assert.equal(s.vite, vite);
+});
+
+/** Fino a quando il boss ha finito di bere. */
+function angeloBevuto(s) {
+  while (!s.boss.angeloBevuto) {
+    s.graziaT = 1;
+    passo(s);
+  }
+}
+
+test("entrando in terza fase il boss beve l'Angelo Azzurro: 5 vite, dopo il ruggito, senza attaccare", () => {
+  const { s, eventi } = inDuello();
+  finoAVite(s, 3);
+  assert.equal(s.boss.livello, 2);
+  assert.ok(s.boss.ruggito > 0);
+  assert.equal(s.boss.angelo, null, "prima ruggisce");
+  while (s.boss.ruggito > 0) passo(s);
+  assert.equal(s.boss.angelo.stato, "porta");
+  const inizio = s.t;
+  s.boss.prossimoLancio = 0;
+  while (s.boss.angelo) {
+    assert.equal(s.boss.carica, null);
+    s.graziaT = 1;
+    passo(s);
+  }
+  assert.ok(Math.abs(s.t - inizio - TEMPI_ANGELO.porta - TEMPI_ANGELO.beve) < 0.1);
+  assert.equal(s.boss.vite, 8);
+  assert.equal(s.boss.livello, 2, "la fase non scende anche se ora ha 8 vite");
+  assert.deepEqual(eventi.filter((e) => e.tipo.startsWith("angelo")).map((e) => e.tipo), ["angeloPorta", "angeloBeve", "angeloAzzurro"]);
+});
+
+test("l'Angelo Azzurro si beve una volta sola, e non oltre le 10 vite", () => {
+  const { s, eventi } = inDuello();
+  finoAVite(s, 3);
+  angeloBevuto(s);
+  finoAVite(s, 1);
+  s.boss.vite = 3;
+  for (let i = 0; i < 60 * 10; i++) {
+    s.graziaT = 1;
+    passo(s);
+  }
+  assert.equal(s.boss.vite, 3);
+  assert.equal(eventi.filter((e) => e.tipo === "angeloAzzurro").length, 1);
+
+  const altro = inDuello().s;
+  finoAVite(altro, 3);
+  altro.boss.vite = 8;
+  angeloBevuto(altro);
+  assert.equal(altro.boss.vite, VITE_BOSS);
+});
+
+test("le vite dell'Angelo Azzurro si pagano come vite nuove", () => {
+  const { s } = inDuello();
+  finoAVite(s, 3);
+  angeloBevuto(s);
+  s.moltiplicatore = 1;
+  const prima = s.punti;
+  pipistrelloSulBoss(s);
+  assert.ok(Math.abs(s.punti - prima - 500) < 1e-6);
+});
+
+test("il boss non rallenta i lanci dopo aver bevuto", () => {
+  const { s } = inDuello();
+  finoAVite(s, 3);
+  const furia = s.boss.furia;
+  angeloBevuto(s);
+  assert.equal(s.boss.vite, 8);
+  assert.equal(s.boss.furia, furia);
+});
+
+test("la manata attraversa tutta la corsia e torna indietro", () => {
+  const { s, eventi } = inDuello();
+  const m = manataSu(s, 2);
+  const visti = new Set();
+  let minimo = Infinity;
+  while (s.boss.manate.length) {
+    s.graziaT = 1;
+    passo(s);
+    visti.add(m.stato);
+    minimo = Math.min(minimo, m.x);
+  }
+  assert.deepEqual([...visti], ["avviso", "va", "presa", "torna"]);
+  assert.ok(minimo < 0, "arriva oltre il bordo sinistro");
+  assert.ok(eventi.some((e) => e.tipo === "manata"));
+  assert.ok(eventi.some((e) => e.tipo === "manataTorna"));
+});
+
+test("la manata toglie mezza vita a chi resta nella corsia e passa oltre chi l'ha cambiata", () => {
+  const colpo = (corsia, y) => {
+    const { s } = inDuello();
+    manataSu(s, corsia);
+    s.zucco.y = y;
+    s.zucco.vy = 0;
+    s.graziaT = 0;
+    while (s.boss.manate.length && !s.finita) passo(s);
+    return s.vite;
+  };
+  assert.equal(colpo(0, SUOLO), VITE - 0.5);
+  assert.equal(colpo(1, PIATTAFORME[0]), VITE - 0.5);
+  assert.equal(colpo(2, PIATTAFORME[1]), VITE - 0.5);
+  assert.equal(colpo(2, PIATTAFORME[0]), VITE);
+  assert.equal(colpo(0, PIATTAFORME[1]), VITE);
+});
+
+test("con un quarto di vita la manata chiude la partita senza andare sotto zero", () => {
+  const { s } = inDuello();
+  manataSu(s, 1);
+  s.zucco.y = PIATTAFORME[0];
+  s.zucco.vy = 0;
+  s.graziaT = 0;
+  s.vite = 0.25;
+  while (!s.finita) passo(s);
+  assert.equal(s.vite, 0);
+  assert.equal(s.zucco.stato, "ko");
+});
+
+test("la manata non si ferma con la mazza", () => {
+  const { s } = inDuello();
+  manataSu(s, 1);
+  s.zucco.y = PIATTAFORME[0];
+  s.zucco.vy = 0;
+  s.graziaT = 0;
+  while (s.boss.manate[0]?.stato === "avviso") passo(s);
+  while (s.vite === VITE && s.boss.manate.length) passo(s, [IN.MAZZA]);
+  assert.equal(s.vite, VITE - 0.5);
+});
+
+/** Porta Elef fino al lancio, poi lascia cadere la vita. */
+function vitaLanciata(s, piano) {
+  s.boss.prossimoElef = 0;
+  passo(s);
+  s.boss.elef.piano = piano;
+  while (!s.boss.vita) passo(s);
+  while (!s.boss.vita.atterrata) passo(s);
+  return s.boss.vita;
+}
+
+test("Elef esce dal tetto ogni tanto e lancia una vita su una piattaforma", () => {
+  const { s, eventi } = inDuello();
+  for (const piano of [0, 1]) {
+    const v = vitaLanciata(s, piano);
+    assert.equal(v.x, X_ZUCCO);
+    assert.equal(v.y, PIATTAFORME[piano] - 7);
+    s.boss.vita = null;
+    while (s.boss.elef) passo(s);
+    assert.ok(s.boss.prossimoElef >= 9, "tra un lancio e l'altro passa del tempo");
+  }
+  assert.equal(eventi.filter((e) => e.tipo === "elef").length, 2);
+  assert.equal(eventi.filter((e) => e.tipo === "lanciaVita").length, 2);
+});
+
+test("la vita resta 3 secondi, poi sparisce", () => {
+  const { s, eventi } = inDuello();
+  const v = vitaLanciata(s, 1);
+  const atterrata = s.t;
+  while (s.boss.vita) passo(s);
+  assert.equal(v.piano, 1);
+  assert.ok(Math.abs(s.t - atterrata - DURATA_VITA) < 0.05, `${(s.t - atterrata).toFixed(2)} s`);
+  assert.ok(eventi.some((e) => e.tipo === "vitaSvanita"));
+  assert.equal(s.vite, VITE);
+});
+
+test("salire sulla piattaforma giusta prende la vita, quella sbagliata no", () => {
+  const prova = (y, piano) => {
+    const { s } = inDuello();
+    s.vite = 1.5;
+    vitaLanciata(s, piano);
+    s.zucco.y = y;
+    s.zucco.vy = 0;
+    passo(s);
+    return s.vite;
+  };
+  assert.equal(prova(PIATTAFORME[0], 0), 2.5);
+  assert.equal(prova(PIATTAFORME[1], 1), 2.5);
+  assert.equal(prova(PIATTAFORME[1], 0), 1.5);
+  assert.equal(prova(SUOLO, 0), 1.5);
+});
+
+test("con tutte le vite la vita di Elef vale punti e non supera il massimo", () => {
+  const { s } = inDuello();
+  vitaLanciata(s, 0);
+  s.zucco.y = PIATTAFORME[0];
+  s.zucco.vy = 0;
+  const prima = s.punti;
+  passo(s);
+  assert.equal(s.vite, VITE);
+  assert.ok(s.punti - prima >= 250);
+  assert.equal(s.boss.vita, null);
+});
+
+test("la vita atterra dopo il volo previsto", () => {
+  const { s } = inDuello();
+  s.boss.prossimoElef = 0;
+  passo(s);
+  while (!s.boss.vita) passo(s);
+  const lancio = s.t;
+  while (!s.boss.vita.atterrata) passo(s);
+  assert.ok(Math.abs(s.t - lancio - VOLO_VITA) < 0.05);
+});
+
+test("alla morte del boss spariscono manate, Elef e vita in volo", () => {
+  const { s } = inDuello();
+  s.boss.vite = 1;
+  s.boss.livello = 2;
+  s.boss.manate = [{ corsia: 0, stato: "avviso", t: 0, durata: 1, x: 410 }];
+  s.boss.elef = { stato: "mira", t: 0, piano: 0 };
+  s.boss.vita = { piano: 0, t: 0, x: 100, y: 40, atterrata: false };
+  pipistrelloSulBoss(s);
+  assert.equal(s.boss.fase, "morte");
+  assert.equal(s.boss.manate.length, 0);
+  assert.equal(s.boss.elef, null);
+  assert.equal(s.boss.vita, null);
+});
+
+test("ogni lancio di Elef allunga la pausa prima del successivo", () => {
+  const { s } = inDuello();
+  for (let lanci = 1; lanci <= 4; lanci++) {
+    vitaLanciata(s, 0);
+    s.boss.vita = null;
+    while (s.boss.elef) passo(s);
+    const pausa = s.boss.prossimoElef;
+    assert.ok(pausa >= 10 + 6 * lanci && pausa < 17 + 6 * lanci, `dopo ${lanci} lanci: ${pausa.toFixed(1)} s`);
+  }
+});
+
+test("le vite che il boss si riprende non pagano due volte", () => {
+  const { s } = inDuello();
+  s.moltiplicatore = 1;
+  const colpo = () => {
+    const prima = s.punti;
+    pipistrelloSulBoss(s);
+    return s.punti - prima;
+  };
+  assert.ok(Math.abs(colpo() - 500) < 1e-6);
+  s.boss.vite = VITE_BOSS;
+  assert.equal(colpo(), 0, "riportarlo dov'era già stato non vale");
+  assert.ok(Math.abs(colpo() - 500) < 1e-6, "scendere sotto il minimo sì");
+});
+
+test("anche chi sbaglia quasi tutto finisce il duello: le vite di Elef non lo tengono in piedi per sempre", () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    const s = giocaDuello(seed, { sbaglia: 0.6, distratto: 0.6 });
+    assert.ok(s.finita, `seed ${seed}: dopo ${s.boss.durataDuello.toFixed(0)} s non è finita`);
+  }
+});
+
+test("rompere gli ostacoli con la luna piena vale 100 punti e l'evento li annuncia", () => {
+  const eventi = [];
+  const s = creaPartita(3, (e) => eventi.push(e));
+  passo(s);
+  s.lunaT = 3;
+  s.moltiplicatore = 1.5;
+  const prima = s.punti;
+  s.ostacoli.push(ostacolo("mano"), ostacolo("demone"));
+  s.ostacoli.forEach((o) => {
+    o.salita = 1;
+    o.carica = 1;
+    o.x0 = o.x;
+  });
+  passo(s);
+  assert.equal(s.rotti, 2);
+  assert.ok(s.punti - prima >= 300);
+  assert.deepEqual(eventi.filter((e) => e.tipo === "rotto").map((e) => e.punti), [150, 150]);
 });
 
 test("si può salire sulle due piattaforme e scendere attraversandole", () => {
@@ -383,7 +920,7 @@ test("il giocatore preciso batte il boss, e il duello dura il giusto", () => {
   const m = mediana(durate);
   console.log(`duello: ${vittorie}/60 vinti, mediana ${m?.toFixed(0)} s`);
   assert.ok(vittorie >= 54, `${vittorie}/60`);
-  assert.ok(m >= 20 && m <= 70, `mediana ${m} s`);
+  assert.ok(m >= 50 && m <= 110, `mediana ${m} s`);
 });
 
 test("una vittoria vale più di una sconfitta e si rigioca uguale", () => {
@@ -554,7 +1091,7 @@ test("nel finale le caramelle non accendono più la luna, che non si spegnerebbe
 });
 
 test("il tema del boss si fa più furioso man mano che il boss perde vite", () => {
-  assert.deepEqual([VITE_BOSS, 7, 6, 4, 3, 1].map(livelloTemaBoss), [0, 0, 1, 1, 2, 2]);
+  assert.deepEqual([VITE_BOSS, 7, 6, 4, 3, 1].map(faseDaVite), [0, 0, 1, 1, 2, 2]);
   for (let i = 1; i < TEMA_BOSS.length; i++) assert.ok(TEMA_BOSS[i].bpm > TEMA_BOSS[i - 1].bpm);
 });
 

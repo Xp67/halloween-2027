@@ -10,6 +10,7 @@ const MOLTIPLICATORE_MINIMO = 1;
 const PIU_CARAMELLA = 0.01;
 const MENO_CARAMELLA = 0.1;
 const MENO_VITA = 0.3;
+const PIU_FUORICAMPO = 0.1;
 
 function sposta(s, quanto) {
   s.moltiplicatore = Math.max(MOLTIPLICATORE_MINIMO, Math.round((s.moltiplicatore + quanto) * 100) / 100);
@@ -21,6 +22,7 @@ export function guadagna(s, punti) {
 }
 
 export const caramellaPresa = (s) => sposta(s, PIU_CARAMELLA);
+export const fuoricampoFatto = (s) => sposta(s, PIU_FUORICAMPO);
 
 export function caramellaPersa(s, d) {
   const prima = s.moltiplicatore;
@@ -28,10 +30,11 @@ export function caramellaPersa(s, d) {
   if (s.moltiplicatore < prima) s.alEvento({ tipo: "caramellaPersa", x: d.x, y: d.y });
 }
 
-export function perdiVita(s) {
-  s.vite--;
+/** Nel duello si perdono anche frazioni di vita: il moltiplicatore cala in proporzione. */
+export function perdiVita(s, quanto = 1) {
+  s.vite = Math.max(0, s.vite - quanto);
   s.lunePulite = 0;
-  sposta(s, -MENO_VITA);
+  sposta(s, -MENO_VITA * quanto);
 }
 
 /** Tre lune di fila senza perdere vite: se ne manca una torna, con tutte le vite sono punti extra. */

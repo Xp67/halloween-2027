@@ -20,6 +20,8 @@ import * as shootingStars from "pixelfx/fx/weather/shooting-stars";
 import { forzaTerremoto } from "./boss.js";
 import { ALTEZZA, LARGHEZZA, SUOLO, X_ZUCCO } from "./sim.js";
 
+const AZZURRO = ["#04122a", "#0a2a5e", "#1450a0", "#2a8cff", "#5cb0ff", "#8fd0ff", "#d0ecff", "#ffffff"];
+const SANGUE = ["#1c0408", "#3a0a12", "#6a1020", "#a01a2c", "#d02a3a", "#ff5e5e", "#ffb0a0", "#ffffff"];
 const ORO = ["#3a1a08", "#7a3a10", "#c8701a", "#f5a72e", "#ffd24a", "#ffe98a", "#fff6c8", "#ffffff"];
 const ZUCCHERO = ["#3a0a2a", "#7a1a52", "#c02a68", "#ff6fa8", "#ffb2cf", "#ffe45e", "#fff6c8", "#ffffff"];
 
@@ -30,6 +32,7 @@ const LAMPI = {
   caramella: { modulo: hitSpark, ritmo: 1, mondo: true, opzioni: { palette: ZUCCHERO, aim: -Math.PI / 2, height: 0 } },
   rotto: { modulo: bluntHit, ritmo: 1, mondo: true },
   urto: { modulo: smallExplosion, ritmo: 1.5, mondo: true },
+  botta: { modulo: bluntHit, ritmo: 1.2, mondo: false },
   ko: { modulo: cartoonPow, ritmo: 1, mondo: false, opzioni: { text: "AHI!" } },
   luna: { modulo: manaBurst, ritmo: 1, mondo: false, opzioni: { palette: ORO } },
   mazzata: { modulo: hitSpark, ritmo: 1, mondo: false, opzioni: { palette: ORO, height: 0 } },
@@ -37,6 +40,9 @@ const LAMPI = {
   bossAtterra: { modulo: groundSlam, ritmo: 1.5, mondo: false },
   bossColpito: { modulo: smallExplosion, ritmo: 1.6, mondo: false },
   bossMuore: { modulo: darkExplosion, ritmo: 1.2, mondo: false },
+  bossCura: { modulo: manaBurst, ritmo: 1.4, mondo: false, opzioni: { palette: SANGUE } },
+  angeloAzzurro: { modulo: manaBurst, ritmo: 1.2, mondo: false, opzioni: { palette: AZZURRO } },
+  vitaPresa: { modulo: manaBurst, ritmo: 1.6, mondo: false, opzioni: { palette: ORO } },
   evviva: { modulo: confetti, ritmo: 1, mondo: false },
 };
 
@@ -83,21 +89,38 @@ const DETRITI_AL_SECONDO = 140;
 const SASSI_DEL_PRESAGIO = 16;
 const QUOTA_GRONDA = SUOLO - 78;
 
-const SCOSSE = { rotto: 2, urto: 4, luna: 3, presagio: 3, bossAtterra: 6, bossColpito: 3, bossMuore: 6 };
+const SCOSSE = { rotto: 2, urto: 4, botta: 3, luna: 3, presagio: 3, bossAtterra: 6, bossColpito: 3, bossMuore: 6, mazzata: 2, fuoricampo: 3, faseBoss: 6, angeloAzzurro: 3, manata: 3 };
 const ANNUNCI = {
   vitaRecuperata: () => "VITA RECUPERATA!",
   treLune: (punti) => `TRE LUNE! ${punti} PUNTI`,
 };
 const DURATA_ANNUNCIO = 2;
+
+// I lampi del duello escono dai 320x180 della corsa: il boss arriva oltre il bordo destro e sopra il cielo.
+const LARGHEZZA_LAMPI = LARGHEZZA + 100;
+const MARGINE_LAMPI = 60;
+
+// Le scritte che salgono dal punto dell'azione: ognuna spiega cosa è appena successo.
+const SCRITTE = {
+  rotto: ({ punti }) => ({ testo: `+${punti}`, colore: "#ffe45e", su: 10 }),
+  vitaPresa: ({ punti }) => ({ testo: punti ? `+${punti}` : "+1 VITA", colore: "#ffe45e", su: 14 }),
+  bossCura: () => ({ testo: "+1", colore: "#ff8a7a", su: 40, scala: 3 }),
+  angeloAzzurro: ({ punti }) => ({ testo: `+${punti}`, colore: "#8fd0ff", su: 40, scala: 3 }),
+  fuoricampo: ({ punti }) => ({ testo: `+${punti}`, colore: "#ffe45e", su: 12 }),
+  botta: ({ scritta }) => ({ testo: scritta, colore: "#ffffff", su: 34, scala: 2 }),
+  urto: ({ scritta }) => (scritta ? { testo: scritta, colore: "#ffffff", su: 34, scala: 2 } : null),
+};
+const DURATA_SCRITTA = 0.9;
+const SALITA_SCRITTA = 22;
 const INIZIO_STELLE_CADENTI = 40;
 const ORIGINE_METEO = { x: LARGHEZZA / 2, y: 170 };
 
-function creaLivello() {
-  const frame = createFrame(LARGHEZZA, ALTEZZA);
-  const img = new ImageData(LARGHEZZA, ALTEZZA);
+function creaLivello(w = LARGHEZZA, h = ALTEZZA) {
+  const frame = createFrame(w, h);
+  const img = new ImageData(w, h);
   const tela = document.createElement("canvas");
-  tela.width = LARGHEZZA;
-  tela.height = ALTEZZA;
+  tela.width = w;
+  tela.height = h;
   const ctx = tela.getContext("2d");
   return {
     tela,
@@ -139,7 +162,7 @@ export function creaEffetti({ scosseAttive, sprite }) {
   const livelloCielo = creaLivello();
   const livelloNebbia = creaLivello();
   const livelloDietro = creaLivello();
-  const livelloDavanti = creaLivello();
+  const livelloDavanti = creaLivello(LARGHEZZA_LAMPI, ALTEZZA + MARGINE_LAMPI);
   const livelloOrda = creaLivello();
 
   const stelleCadenti = createFx(shootingStars, ORIGINE_METEO);
@@ -154,6 +177,7 @@ export function creaEffetti({ scosseAttive, sprite }) {
   let detriti = 0;
   let scossa = 0;
   let annuncio = null;
+  let scritte = [];
   let turno = false;
 
   function attoreDi(s) {
@@ -211,6 +235,7 @@ export function creaEffetti({ scosseAttive, sprite }) {
     for (const [o, fx] of demoni)
       if (o.rotto || !s.ostacoli.includes(o)) {
         fx.stop();
+        fx.options.y += MARGINE_LAMPI;
         lampi.push({ fx, ritmo: 1, mondo: true });
         demoni.delete(o);
       }
@@ -228,11 +253,13 @@ export function creaEffetti({ scosseAttive, sprite }) {
   }
 
   return {
-    evento({ tipo, x, y, punti }) {
+    evento({ tipo, x, y, punti, scritta }) {
       if (ANNUNCI[tipo]) annuncio = { testo: ANNUNCI[tipo](punti), t: DURATA_ANNUNCIO };
+      const riga = SCRITTE[tipo]?.({ punti, scritta });
+      if (riga) scritte.push({ scala: 1, ...riga, x, y: y - riga.su, t: 0 });
       const lampo = LAMPI[tipo];
       if (lampo) {
-        const fx = createFx(lampo.modulo, { ...lampo.opzioni, x, y, seed: Math.floor(Math.random() * 1000) });
+        const fx = createFx(lampo.modulo, { ...lampo.opzioni, x, y: y + MARGINE_LAMPI, seed: Math.floor(Math.random() * 1000) });
         lampi.push({ fx, ritmo: lampo.ritmo, mondo: lampo.mondo });
       }
       const nuvola = POLVERE[tipo];
@@ -262,6 +289,11 @@ export function creaEffetti({ scosseAttive, sprite }) {
         annuncio.t -= dt;
         if (annuncio.t <= 0) annuncio = null;
       }
+      for (const r of scritte) {
+        r.t += dt;
+        r.x -= s.velocita * dt * 0.5;
+      }
+      scritte = scritte.filter((r) => r.t < DURATA_SCRITTA);
       for (const p of polvere) {
         p.vita -= dt;
         p.vy += GRAVITA_POLVERE * dt;
@@ -284,7 +316,7 @@ export function creaEffetti({ scosseAttive, sprite }) {
       if (scia) {
         const attore = attoreDi(s);
         scia.options.x = X_ZUCCO;
-        scia.options.y = s.zucco.y;
+        scia.options.y = s.zucco.y + MARGINE_LAMPI;
         scia.options.actor = attore;
         scia.update(dt);
         storia.push({ t: s.t, y: s.zucco.y, attore });
@@ -354,7 +386,7 @@ export function creaEffetti({ scosseAttive, sprite }) {
         scia?.draw(f, "front");
         for (const l of lampi) l.fx.draw(f);
       });
-      ctx.drawImage(livelloDavanti.tela, 0, 0);
+      ctx.drawImage(livelloDavanti.tela, 0, -MARGINE_LAMPI);
     },
 
     get scossa() {
@@ -363,6 +395,11 @@ export function creaEffetti({ scosseAttive, sprite }) {
 
     get annuncio() {
       return annuncio?.testo;
+    },
+
+    /** Le scritte del momento, già nella posizione in cui disegnarle. */
+    get scritte() {
+      return scritte.map((r) => ({ ...r, y: r.y - SALITA_SCRITTA * (r.t / DURATA_SCRITTA) ** 0.5, svanisce: r.t > DURATA_SCRITTA * 0.7 }));
     },
 
     scosseAttive,
@@ -374,6 +411,7 @@ export function creaEffetti({ scosseAttive, sprite }) {
       polvere = [];
       detriti = 0;
       annuncio = null;
+      scritte = [];
       scia = null;
       scossa = 0;
     },

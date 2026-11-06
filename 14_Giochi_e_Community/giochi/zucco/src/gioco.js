@@ -37,7 +37,7 @@ const MARKUP = `
       <div class="zucco-comandi" hidden>
         <p><b>Salta:</b> spazio, freccia su o tocco. Tieni premuto per saltare più in alto.</p>
         <p><b>Scivola:</b> freccia giù. In aria ti fa scendere prima.</p>
-        <p><b>Mazza:</b> nel finale, tasto X o freccia destra.</p>
+        <p><b>Mazza:</b> nel finale, tasto X o freccia destra. Due homerun fanno arrivare i pipistrelli: solo quelli feriscono il boss. Le mani nere non si parano: cambia piano.</p>
         <p><b>Audio:</b> tasto M o la nota qui accanto. In cuffia si sente da dove arrivano le cose.</p>
         <p><b>Caramelle:</b> con 20 arriva la luna piena e per 6 secondi rompi tutto.</p>
       </div>

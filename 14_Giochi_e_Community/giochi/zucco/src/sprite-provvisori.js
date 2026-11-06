@@ -1,6 +1,8 @@
 // Sprite provvisori, disegnati in codice nello stesso formato JSON che restituisce SpriteForge
 // (size, palette, grid, frames). Un file assets/sprite/<nome>.json con quel formato prende il loro posto.
 
+import { ANGOLI_SWING } from "./costanti.js";
+
 const COLORI = {
   k: "#160f1e", n: "#23304f",
   o: "#9c3b17", O: "#d9661a", y: "#f59a2e", h: "#ffd07a", b: "#4a1a12",
@@ -13,6 +15,7 @@ const COLORI = {
   W: "#f4fbff", C: "#bfe3f0", N: "#7fa8cc",
   u: "#ff6fa8", U: "#c02a68", t: "#37d6c2", z: "#128a8c", Y: "#ffe45e", Z: "#d68a18",
   f: "#7a5a44", F: "#4e3628", H: "#d03a2c", J: "#7e1a20", Q: "#030104", X: "#8a1e36",
+  l: "#2a8cff", j: "#8fd0ff",
 };
 const CHIAVI = Object.keys(COLORI);
 const PALETTA = Object.values(COLORI);
@@ -439,6 +442,38 @@ function zombie(f) {
   return t;
 }
 
+/** Lo scagnozzo che versa: fermo sulle gambe, con il braccio teso in avanti, alto di `alza` pixel. */
+function scheletroVersa(alza) {
+  const t = new Tela(22, 27);
+  for (const dx of [-2, 2]) {
+    t.linea(8 + dx, 17, 8 + dx, 25, "W");
+    t.rett(8 + dx, 25, 3, 1, "W");
+  }
+  t.linea(9, 9, 5, 13, "N");
+  t.linea(8, 7, 8, 16, "C");
+  for (const y of [9, 11, 13]) t.linea(5, y, 11, y, "W");
+  t.rett(6, 15, 5, 2, "C");
+  t.linea(9, 10, 18, 10 - alza, "W");
+  t.stampa(TESCHIO, 5, 0);
+  return t;
+}
+
+/** Lo scagnozzo che mescola: le braccia vanno avanti e indietro di `su` pixel. */
+function zombieMescola(su) {
+  const t = new Tela(22, 27);
+  for (const dx of [-2, 2]) {
+    for (const lato of [0, 1]) t.linea(8 + dx + lato, 17, 8 + dx + lato, 25, "B");
+    t.rett(8 + dx, 25, 4, 1, "k");
+  }
+  t.rett(5, 7, 8, 10, "R");
+  for (let y = 7; y < 17; y++) t.punto(5 + (y % 3), y, "T");
+  t.rett(7, 15, 2, 2, "v");
+  t.rett(11, 10 + su, 8, 2, "v");
+  t.punto(19, 10 + su, "V");
+  t.stampa(TESTA_ZOMBIE, 5, 0);
+  return t;
+}
+
 const TESTA_LUPO = [
   "..k.k....",
   ".kfkfk...",
@@ -559,13 +594,13 @@ function mazza() {
   return t.contorna();
 }
 
-/** La mazza in mano, a vari angoli: da caricata a fine colpo. */
+/** La mazza in mano, una posa per ogni tick dello swing. */
 function mazzaInMano(gradi) {
-  const t = new Tela(60, 60);
+  const t = new Tela(68, 68);
   const a = (gradi * Math.PI) / 180;
-  for (let i = 0; i < 26; i++) {
-    const x = Math.round(30 + Math.cos(a) * i), y = Math.round(30 + Math.sin(a) * i);
-    const grosso = i < 9 ? 1 : i < 18 ? 2 : 3;
+  for (let i = 0; i < 30; i++) {
+    const x = Math.round(34 + Math.cos(a) * i), y = Math.round(34 + Math.sin(a) * i);
+    const grosso = i < 10 ? 1 : i < 20 ? 2 : 3;
     t.rett(x - (grosso >> 1), y - (grosso >> 1), grosso, grosso, i < 7 ? "k" : "f");
   }
   return t.contorna();
@@ -596,6 +631,58 @@ function osso() {
   ]);
 }
 
+// Elef guarda a sinistra, verso le piattaforme: cappello da festa e camicia del colore di GetInvolved.
+const ELEF = [
+  "....Y.......",
+  "...kkk......",
+  "...ktk......",
+  "..ktttk.....",
+  "..kutuk.....",
+  ".kttuttk....",
+  "kFFFFFFFk...",
+  "khhhhhhhk...",
+  "kkhhkhhhk...",
+  "khhhhhhhk...",
+  "kuuuhhhhk...",
+  ".khhhhhk....",
+  "..kqqqk.....",
+  ".kqqqqqk....",
+  ".kqqWqqk....",
+  ".kqqqqqk....",
+  "..kDDDk.....",
+  "..kDkDk.....",
+  "..kkkkk.....",
+];
+
+function elef(mano) {
+  const t = new Tela(22, 19).stampa(ELEF, 5, 0);
+  const spalla = [mano[0] < 11 ? 7 : 11, 13];
+  t.linea(spalla[0], spalla[1] + 1, mano[0], mano[1] + 1, "k");
+  t.linea(spalla[0], spalla[1], mano[0], mano[1], "q");
+  t.rett(mano[0] - 1, mano[1] - 1, 2, 2, "h");
+  return t;
+}
+
+function angeloAzzurro(livello) {
+  const t = new Tela(11, 11).stampa([
+    "W.........W",
+    ".W.......W.",
+    "..W.....W..",
+    "...W...W...",
+    "....W.W....",
+    ".....W.....",
+    ".....W.....",
+    ".....W.....",
+    ".....W.....",
+    ".....W.....",
+    "...WWWWW...",
+  ]);
+  // Il drink cala riga per riga, dall'orlo verso il fondo del calice.
+  for (let y = livello; y < 5; y++) for (let x = y + 1; x < 10 - y; x++) t.punto(x, y, y === livello ? "j" : "l");
+  if (livello === 0) t.rett(9, 0, 2, 2, "Y");
+  return t;
+}
+
 const VITA = [
   "....g....",
   "..kkGkk..",
@@ -623,7 +710,11 @@ export const SPRITE_PROVVISORI = {
   boss_volto: sprite(volto("fermo"), volto("ruggito"), volto("colpito")),
   boss_mano: sprite(manoGigante("aperta"), manoGigante("artiglio"), manoGigante("pugno")),
   mazza: sprite(mazza()),
-  mazza_in_mano: sprite(...[-125, -70, -10, 45].map(mazzaInMano)),
+  mazza_in_mano: sprite(...ANGOLI_SWING.map(mazzaInMano)),
+  elef: sprite(elef([13, 16]), elef([16, 7]), elef([2, 8]), elef([16, 4])),
+  scagnozzo_scheletro: sprite(scheletroVersa(1), scheletroVersa(10)),
+  scagnozzo_zombie: sprite(zombieMescola(0), zombieMescola(2)),
+  angelo_azzurro: sprite(angeloAzzurro(0), angeloAzzurro(2), angeloAzzurro(5)),
   piattaforma: sprite(piattaforma()),
   lancio_osso: sprite(osso()),
   lancio_teschio: sprite(new Tela(8, 7).stampa(TESCHIO)),

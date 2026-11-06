@@ -22,7 +22,7 @@ import { PIXEL_PER_PUNTO, caramellaPersa, caramellaPresa, guadagna, lunaAccesa, 
 
 export { ALTEZZA, DURATA_STAGE, IN, LARGHEZZA, SUOLO, TICK, VITE, X_ZUCCO } from "./costanti.js";
 
-export const VERSIONE = 2;
+export const VERSIONE = 3;
 export const CARAMELLE_LUNA = 20;
 
 const DURATA_LUNA = 6;
@@ -32,7 +32,7 @@ const PASSO_STAGE = 32;
 const RAMPA_STAGE = 1;
 const TREGUA_STAGE = 1.3;
 const PUNTI_CARAMELLA = 10;
-const PUNTI_ROTTO = 25;
+const PUNTI_ROTTO = 100;
 const CARAMELLA_SALTATA = 18;
 
 const ZUCCO_IN_PIEDI = { w: 12, h: 24 };
@@ -302,7 +302,7 @@ function urti(s) {
       o.rotto = true;
       s.rotti++;
       guadagna(s, PUNTI_ROTTO);
-      s.alEvento({ tipo: "rotto", x: o.x + o.w / 2, y: Math.max(o.y, SUOLO - 30) });
+      s.alEvento({ tipo: "rotto", x: o.x + o.w / 2, y: Math.max(o.y, SUOLO - 30), punti: Math.round(PUNTI_ROTTO * s.moltiplicatore) });
     } else if (s.graziaT <= 0) {
       o.rotto = true;
       perdiVita(s);
