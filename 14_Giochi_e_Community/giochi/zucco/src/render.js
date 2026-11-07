@@ -144,6 +144,11 @@ const COLORE_MANO = "#ffd07a";
 const TACCA_VITA = 3;
 const TACCHE_PER_VITA = 4;
 const RITIRATA_MANI = 2.4;
+// Lo scambio: quanto si scurisce lo schermo, e quanto resta acceso sopra e sotto la corsia del pipistrello.
+const BUIO_SCAMBIO = 0.6;
+const MEZZA_CORSIA = 15;
+const VITA_IN_PERICOLO = 1;
+const BATTITI_AL_SECONDO = 1.2;
 const FASI_SENZA_BOSS = ["arrivo", "frenata", "silenzio", "trema"];
 const FINESTRE = [[36, 72], [132, 72], [136, 24]];
 const LUCI_CASA = [...FINESTRE.map(([x, y]) => [x, y, 14, 18]), [80, 90, 22, 32]];
@@ -557,6 +562,10 @@ export function creaRender(canvas, sprite, effetti) {
   let faseOrda = 0;
   let W = LARGHEZZA;
   let H = ALTEZZA;
+  // Lo scambio col boss spegne lo schermo piano, e piano lo riaccende quando finisce.
+  let focus = 0;
+  let corsiaFocus = 1;
+  let battito = 0;
   let assedioVisto = 0;
   let pienoVisto = PIENO_INIZIALE;
   let moltiplicatoreVisto = 1;
@@ -1168,6 +1177,10 @@ export function creaRender(canvas, sprite, effetti) {
   /** Quanti homerun mancano ai pipistrelli, sotto la barra del boss: senza, la regola non si capirebbe. */
   function contoHomerun(b) {
     if (b.fase !== "duello") return;
+    if (b.scambio) {
+      scrivi(`SCAMBIO ${b.scambio.colpi}`, W / 2, 35, { centro: true, colore: "#ffe45e" });
+      return;
+    }
     if (b.homerun >= HOMERUN_PER_PIPISTRELLO) {
       if (Math.floor(faseOrda * 5) % 2) scrivi("PIPISTRELLI!", W / 2, 35, { centro: true, colore: "#ffe45e" });
       return;
@@ -1381,6 +1394,37 @@ export function creaRender(canvas, sprite, effetti) {
     ctx.globalAlpha = 1;
   }
 
+  /** Durante lo scambio resta accesa solo la corsia dove vola il pipistrello: tutto il resto è fermo. */
+  function focusScambio(s, dt) {
+    const sc = s.boss?.scambio;
+    if (sc) corsiaFocus = sc.corsia;
+    focus += ((sc ? 1 : 0) - focus) * Math.min(1, dt * 7);
+    if (focus < 0.01) return;
+    const y = CORSIE[corsiaFocus];
+    ctx.globalAlpha = BUIO_SCAMBIO * focus;
+    ctx.fillStyle = "#05020a";
+    ctx.fillRect(0, -60, W, y - MEZZA_CORSIA + 60);
+    ctx.fillRect(0, y + MEZZA_CORSIA, W, ALTEZZA - y - MEZZA_CORSIA);
+    ctx.globalAlpha = 1;
+  }
+
+  /** Con poca vita i bordi pulsano di rosso come un battito, più forte sotto mezza vita. Senza movimento resta fisso. */
+  function pericolo(s, dt) {
+    if (s.finita || s.vite <= 0 || s.vite > VITA_IN_PERICOLO) return;
+    battito += dt;
+    let k = 0.55;
+    if (effetti.scosseAttive) {
+      const f = (battito * BATTITI_AL_SECONDO) % 1;
+      k = Math.exp(-(((f - 0.05) / 0.07) ** 2)) + 0.6 * Math.exp(-(((f - 0.3) / 0.07) ** 2));
+    }
+    const forza = Math.min(0.75, (0.2 + 0.4 * k) * (s.vite <= 0.5 ? 1.35 : 1));
+    const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.42, W / 2, H / 2, W * 0.62);
+    g.addColorStop(0, "rgba(200, 16, 40, 0)");
+    g.addColorStop(1, `rgba(200, 16, 40, ${forza.toFixed(3)})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
   const film = creaCinematica({ ctx, sprite, effetti, casa, cielo: strati[1].cielo, suolo, scrivi });
 
   return {
@@ -1467,8 +1511,10 @@ export function creaRender(canvas, sprite, effetti) {
         disegnaZucco(s);
         ctx.restore();
       }
+      focusScambio(s, dt);
       ctx.restore();
 
+      if (!titolo) pericolo(s, dt);
       if (titolo) {
         scrivi("LA FUGA DI", W / 2, 26, { centro: true, colore: "#fff3b0", scala: 2 });
         scrivi("ZUCCO", W / 2, 46, { centro: true, colore: "#f59a2e", scala: 5 });

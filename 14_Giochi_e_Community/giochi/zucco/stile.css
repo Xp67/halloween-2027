@@ -265,36 +265,40 @@ body {
   margin-bottom: 0;
 }
 
+/* Salta sopra Scivola sotto il pollice destro, la Mazza al sinistro. Fuori dal duello la Mazza non c'è, ma
+   gli altri due restano dove sono: il pollice li trova sempre allo stesso posto. */
 .zucco-tocco {
   display: none;
   grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "mazza salta"
+    "mazza scivola";
   gap: 10px;
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
 }
 
 .zucco-tocco button {
-  min-height: 96px;
+  min-height: 76px;
   font-size: 20px;
   text-transform: uppercase;
   touch-action: none;
 }
 
-.zucco-tocco.con-mazza {
-  grid-template-columns: 1fr 1fr 1fr;
-}
-
 .zucco-mazza {
+  grid-area: mazza;
   color: var(--zucco-testo) !important;
   background: #8a1e36;
   box-shadow: inset 3px 3px 0 #c8483f;
 }
 
 .zucco-salta {
+  grid-area: salta;
   background: var(--zucco-arancio);
   box-shadow: inset -3px -3px 0 var(--zucco-arancio-scuro), inset 3px 3px 0 #ffd07a;
 }
 
 .zucco-scivola {
+  grid-area: scivola;
   color: var(--zucco-testo) !important;
   background: var(--zucco-viola);
   box-shadow: inset 3px 3px 0 var(--zucco-viola-chiaro);
@@ -317,17 +321,13 @@ body {
     inset: auto 0 0;
     grid-template-columns: 110px 110px;
     justify-content: space-between;
-    gap: 10px;
+    gap: 8px;
     padding: 8px 16px;
     pointer-events: none;
   }
 
-  .zucco-tocco.con-mazza {
-    grid-template-columns: 110px 110px 110px;
-  }
-
   .zucco-tocco button {
-    min-height: 72px;
+    min-height: 54px;
     font-size: 15px;
     opacity: 0.7;
     pointer-events: auto;

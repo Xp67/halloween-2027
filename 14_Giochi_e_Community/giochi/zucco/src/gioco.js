@@ -39,7 +39,7 @@ const MARKUP = `
       <div class="zucco-comandi" hidden>
         <p><b>Salta:</b> spazio, freccia su o tocco. Tieni premuto per saltare più in alto.</p>
         <p><b>Scivola:</b> freccia giù. In aria ti fa scendere prima.</p>
-        <p><b>Mazza:</b> nel finale, tasto X o freccia destra. Due homerun fanno arrivare i pipistrelli: solo quelli feriscono il boss. Le mani nere non si parano: cambia piano.</p>
+        <p><b>Mazza:</b> nel finale, tasto X o freccia destra. Due homerun fanno arrivare i pipistrelli: solo quelli feriscono il boss. Alla fine il boss li ribatte: rimandaglieli finché sbaglia, e perde 2 vite. Le mani nere non si parano: cambia piano.</p>
         <p><b>Audio:</b> tasto M o la nota qui accanto. In cuffia si sente da dove arrivano le cose.</p>
         <p><b>Caramelle:</b> con 20 arriva la luna piena e per 6 secondi rompi tutto.</p>
         <form class="zucco-codice">
@@ -110,7 +110,6 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   const comandi = trova("comandi");
   const tastoSuono = trova("suono");
   const tastoMazza = trova("mazza");
-  const barraTocco = trova("tocco");
   const formCodice = trova("codice");
   const campoCodice = trova("codice-campo");
   let daSecondo = new URLSearchParams(location.search).has("boss") ? TEMPO_BOSS - 1 : 0;
@@ -211,7 +210,6 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
     alTermine(risultato(s));
     risultatoInviato = true;
     tastoMazza.hidden = true;
-    barraTocco.classList.remove("con-mazza");
   }
 
   /** `deciso`: arriva dal tasto Rigioca, l'unico che può lasciare un record senza nome. */
@@ -347,11 +345,7 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
         accumulo -= TICK;
       }
       audio.aggiorna(s);
-      const duello = s.boss?.fase === "duello";
-      if (duello === tastoMazza.hidden) {
-        tastoMazza.hidden = !duello;
-        barraTocco.classList.toggle("con-mazza", duello);
-      }
+      tastoMazza.hidden = s.boss?.fase !== "duello";
       if (s.finita) {
         if (s.vinta) avviaCinematica();
         else termina();

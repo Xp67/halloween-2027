@@ -97,6 +97,16 @@ const MANATE_DOPPIE = 0.4;
 const RITARDO_SECONDA_MANATA = 0.15;
 const ALTEZZA_MANATA = 18;
 
+// Lo scambio, in terza fase: un pipistrello su due il boss lo ribatte, e mentre ci si passa il colpo il resto si ferma.
+// Al primo arrivo lo ribatte sempre, poi sempre meno spesso: quando non ci riesce perde 2 vite. Ogni ribattuta è più
+// veloce della precedente, fino a un tetto che resta prendibile.
+const RIBATTUTE = [1, 0.8, 0.6, 0.4, 0.2];
+const VELOCITA_RIBATTUTA = 300;
+const PIU_VELOCE_RIBATTUTA = 35;
+const VELOCITA_MAX_RIBATTUTA = 440;
+const VITE_SCAMBIO = 2;
+const PAUSA_DOPO_SCAMBIO = 1;
+
 // Elef: l'amico sul tetto. Ogni tanto si affaccia dal colmo e lancia una vita su una delle piattaforme.
 export const X_ELEF = X_CASA_FERMA + 90;
 export const Y_ELEF = SUOLO - 116;
@@ -138,6 +148,8 @@ export function iniziaBoss(s) {
     angelo: null,
     angeloBevuto: false,
     homerun: 0,
+    homerunPagati: 0,
+    colpiVeri: 0,
     spinta: 0,
     mazzaX: null,
     apertura: 0,
@@ -147,6 +159,8 @@ export function iniziaBoss(s) {
     prossimoLancio: 1.2,
     manate: [],
     prossimaManata: 0,
+    pipistrelliFuria: 0,
+    scambio: null,
     elef: null,
     prossimoElef: PRIMO_ELEF,
     vitaLanciate: 0,
@@ -264,7 +278,7 @@ function contatto(s, fermo) {
   s.boss.fermo = fermo;
 }
 
-const attacchiFermi = (b) => b.ruggito > 0 || b.angelo !== null;
+const attacchiFermi = (b) => b.ruggito > 0 || b.angelo !== null || b.scambio !== null;
 
 function lancia(s) {
   const b = s.boss;
@@ -346,7 +360,8 @@ function muoviManata(s, m) {
   }
 
   const z = s.zucco;
-  if (m.x <= X_ZUCCO + 8 && Math.abs(z.y - 12 - CORSIE[m.corsia]) < ALTEZZA_MANATA && s.graziaT <= 0) colpisciZucco(s, COLPO_MANATA);
+  // Quelle ritirate per lo scambio tornano a casa senza colpire.
+  if (!m.ritirata && m.x <= X_ZUCCO + 8 && Math.abs(z.y - 12 - CORSIE[m.corsia]) < ALTEZZA_MANATA && s.graziaT <= 0) colpisciZucco(s, COLPO_MANATA);
 }
 
 function muoviRuggito(s) {
@@ -388,6 +403,8 @@ function curaBoss(b, quante) {
 function muoviElef(s) {
   const b = s.boss;
   if (!b.elef) {
+    // Durante lo scambio Elef aspetta: si affaccia dopo.
+    if (b.scambio) return;
     b.prossimoElef -= TICK;
     if (b.prossimoElef > 0 || b.vita) return;
     b.elef = { stato: "sale", t: 0, piano: Math.floor(s.rng() * PIATTAFORME.length) };
@@ -464,17 +481,23 @@ function colpisciZucco(s, { evento, danno, scritta }) {
   return false;
 }
 
-function colpisciBoss(s, p) {
+function colpisciBoss(s, p, quante = 1) {
   const b = s.boss;
-  b.vite--;
+  let vero = false;
+  for (let i = 0; i < quante && b.vite > 0; i++) {
+    b.vite--;
+    // Le vite che si è ripreso non pagano due volte: farsi colpire apposta non deve fruttare punti.
+    if (b.vite < b.viteMinime) {
+      b.viteMinime = b.vite;
+      guadagna(s, PUNTI_COLPO_BOSS);
+      vero = true;
+    }
+  }
+  if (vero) b.colpiVeri++;
   b.colpito = 0.3;
   b.furia = Math.max(b.furia, (VITE_BOSS - b.vite) / (VITE_BOSS - 1));
-  // Le vite che si è ripreso non pagano due volte: farsi colpire apposta non deve fruttare punti.
-  if (b.vite < b.viteMinime) {
-    b.viteMinime = b.vite;
-    guadagna(s, PUNTI_COLPO_BOSS);
-  }
-  s.alEvento({ tipo: "bossColpito", x: X_BOSS - 10, y: p.y + 24 });
+  if (quante > 1) b.scritta = { testo: "DOPPIO COLPO!", t: DURATA_SCRITTA };
+  s.alEvento({ tipo: "bossColpito", x: X_BOSS - 10, y: p.y + 24, scritta: quante > 1 ? `-${quante}` : undefined });
   if (b.vite > 0) {
     const livello = faseDaVite(b.vite);
     if (livello <= b.livello) return;
@@ -488,6 +511,7 @@ function colpisciBoss(s, p) {
   b.proiettili = [];
   b.carica = null;
   b.manate = [];
+  b.scambio = null;
   b.ruggito = 0;
   b.angelo = null;
   b.elef = null;
@@ -502,6 +526,7 @@ function muoviProiettili(s) {
   const scatola = { x: X_ZUCCO - 6, y: z.y - 24, w: 12, h: 24 };
 
   for (const p of b.proiettili) {
+    if (p.finito) continue;
     p.x += p.vx * TICK;
     p.y += p.vy * TICK;
     p.fase += 8 * TICK;
@@ -515,15 +540,24 @@ function muoviProiettili(s) {
           b.homerun = 0;
           guadagna(s, PUNTI_MAZZATA);
           contatto(s, FERMO_MAZZATA);
-          s.alEvento({ tipo: "mazzata", x: p.x, y: p.y });
+          const colpi = p.scambio ? ++b.scambio.colpi : 0;
+          s.alEvento({ tipo: "mazzata", x: p.x, y: p.y, colpi });
         } else {
           p.stato = "fuori";
           p.vx = 300;
           p.vy = -520;
           b.homerun = Math.min(HOMERUN_PER_PIPISTRELLO, b.homerun + 1);
-          const punti = Math.round(PUNTI_FUORICAMPO * s.moltiplicatore);
-          guadagna(s, PUNTI_FUORICAMPO);
-          fuoricampoFatto(s);
+          // Pagano due fuoricampo per ogni vita vera tolta al boss, più i due del giro in corso, meno due per ogni
+          // vita che si è ripreso colpendo Zucco. Senza questo tetto farsi colpire apposta renderebbe (+0,20 di
+          // moltiplicatore contro -0,075 del colpo preso), in qualunque ordine si facessero colpo e fuoricampo.
+          const riprese = b.vite - b.viteMinime;
+          const paga = b.homerunPagati < HOMERUN_PER_PIPISTRELLO * (b.colpiVeri + 1 - riprese);
+          const punti = paga ? Math.round(PUNTI_FUORICAMPO * s.moltiplicatore) : 0;
+          if (paga) {
+            b.homerunPagati++;
+            guadagna(s, PUNTI_FUORICAMPO);
+            fuoricampoFatto(s);
+          }
           contatto(s, FERMO_FUORICAMPO);
           b.scritta = { testo: "HOMERUUUNNN!!!", t: DURATA_SCRITTA };
           s.alEvento({ tipo: "fuoricampo", x: p.x, y: p.y, punti });
@@ -536,12 +570,60 @@ function muoviProiettili(s) {
         if (colpisciZucco(s, COLPO_LANCIO)) return;
       }
     } else if (p.stato === "ritorno" && p.x >= X_BOSS - 30) {
+      if (ribatte(s, p)) continue;
       p.finito = true;
-      colpisciBoss(s, p);
+      colpisciBoss(s, p, p.scambio ? VITE_SCAMBIO : 1);
       if (b.fase !== "duello") return;
     }
   }
   b.proiettili = b.proiettili.filter((p) => !p.finito && p.x > -30 && p.y > -80);
+  // Il pipistrello dello scambio non c'è più: è arrivato al boss, ha colpito Zucco o è passato oltre.
+  if (b.scambio && !b.proiettili.some((p) => p.scambio)) chiudiScambio(s);
+}
+
+/** Il campo si svuota per lo scambio: i lanci in volo si dissolvono, le manate si ritirano, il prossimo lancio aspetta. */
+function apriScambio(s, p) {
+  const b = s.boss;
+  b.scambio = { corsia: CORSIE.indexOf(p.y), ribattute: 0, colpi: 0 };
+  p.scambio = true;
+  for (const q of b.proiettili)
+    if (q !== p && q.stato === "vola") {
+      q.finito = true;
+      s.alEvento({ tipo: "dissolto", x: q.x, y: q.y });
+    }
+  b.carica = null;
+  for (const m of b.manate) {
+    m.stato = "torna";
+    m.ritirata = true;
+  }
+  s.alEvento({ tipo: "scambio", x: X_BOSS, y: p.y });
+}
+
+/** In terza fase il boss ribatte un pipistrello su due, poi sempre meno spesso. Vero se l'ha ribattuto. */
+function ribatte(s, p) {
+  const b = s.boss;
+  if (b.livello < 2 || (b.scambio && !p.scambio)) return false;
+  if (!b.scambio) {
+    b.pipistrelliFuria++;
+    if (b.pipistrelliFuria % 2) return false;
+    apriScambio(s, p);
+  }
+  const sc = b.scambio;
+  if (s.rng() >= (RIBATTUTE[sc.ribattute] ?? 0)) return false;
+  sc.ribattute++;
+  p.stato = "vola";
+  p.vx = -Math.min(VELOCITA_MAX_RIBATTUTA, VELOCITA_RIBATTUTA + PIU_VELOCE_RIBATTUTA * (sc.ribattute - 1));
+  // La mano si apre sulla corsia: è da lì che il colpo riparte.
+  b.lanciato = { corsia: sc.corsia, t: DURATA_MANO_APERTA };
+  s.alEvento({ tipo: "ribatte", x: p.x, y: p.y, colpi: ++sc.colpi });
+  return true;
+}
+
+function chiudiScambio(s) {
+  const b = s.boss;
+  s.alEvento({ tipo: "fineScambio", x: X_BOSS, y: CORSIE[b.scambio.corsia] });
+  b.scambio = null;
+  b.prossimoLancio = Math.max(b.prossimoLancio, PAUSA_DOPO_SCAMBIO);
 }
 
 function vince(s) {

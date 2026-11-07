@@ -37,6 +37,8 @@ const LAMPI = {
   luna: { modulo: manaBurst, ritmo: 1, mondo: false, opzioni: { palette: ORO } },
   mazzata: { modulo: hitSpark, ritmo: 1, mondo: false, opzioni: { palette: ORO, height: 0 } },
   fuoricampo: { modulo: hitSpark, ritmo: 1, mondo: false, opzioni: { palette: ORO, height: 0, aim: -1 } },
+  // Il boss ribatte: le scintille sono le sue, rosse, e partono verso Zucco.
+  ribatte: { modulo: hitSpark, ritmo: 1, mondo: false, opzioni: { palette: SANGUE, height: 0, aim: Math.PI } },
   bossAtterra: { modulo: groundSlam, ritmo: 1.5, mondo: false },
   bossColpito: { modulo: smallExplosion, ritmo: 1.6, mondo: false },
   bossMuore: { modulo: darkExplosion, ritmo: 1.2, mondo: false },
@@ -81,6 +83,8 @@ const POLVERE = {
   salto: { n: 5, forza: 40 },
   atterra: { n: 7, forza: 55 },
   passo: { n: 2, forza: 22 },
+  // Un lancio che si dissolve quando parte lo scambio.
+  dissolto: { n: 8, forza: 50 },
 };
 const COLORI_POLVERE = ["#6b5a7a", "#8f7fa0"];
 const COLORI_SASSI = ["#8f7fa0", "#b3a6c4", "#d8cfe4"];
@@ -89,7 +93,7 @@ const DETRITI_AL_SECONDO = 140;
 const SASSI_DEL_PRESAGIO = 16;
 const QUOTA_GRONDA = SUOLO - 78;
 
-const SCOSSE = { rotto: 2, urto: 4, botta: 3, luna: 3, presagio: 3, bossAtterra: 6, bossColpito: 3, bossMuore: 6, mazzata: 2, fuoricampo: 3, faseBoss: 6, angeloAzzurro: 3, manata: 3 };
+const SCOSSE = { rotto: 2, urto: 4, botta: 3, luna: 3, presagio: 3, bossAtterra: 6, bossColpito: 3, bossMuore: 6, mazzata: 2, fuoricampo: 3, ribatte: 2, faseBoss: 6, angeloAzzurro: 3, manata: 3 };
 const ANNUNCI = {
   vitaRecuperata: () => "VITA RECUPERATA!",
   treLune: (punti) => `TRE LUNE! ${punti} PUNTI`,
@@ -105,8 +109,9 @@ const SCRITTE = {
   rotto: ({ punti }) => ({ testo: `+${punti}`, colore: "#ffe45e", su: 10 }),
   vitaPresa: ({ punti }) => ({ testo: punti ? `+${punti}` : "+1 VITA", colore: "#ffe45e", su: 14 }),
   bossCura: () => ({ testo: "+1", colore: "#ff8a7a", su: 40, scala: 3 }),
+  bossColpito: ({ scritta }) => (scritta ? { testo: scritta, colore: "#ff6b5e", su: 40, scala: 3 } : null),
   angeloAzzurro: ({ punti }) => ({ testo: `+${punti}`, colore: "#8fd0ff", su: 40, scala: 3 }),
-  fuoricampo: ({ punti }) => ({ testo: `+${punti}`, colore: "#ffe45e", su: 12 }),
+  fuoricampo: ({ punti }) => (punti ? { testo: `+${punti}`, colore: "#ffe45e", su: 12 } : null),
   botta: ({ scritta }) => ({ testo: scritta, colore: "#ffffff", su: 34, scala: 2 }),
   urto: ({ scritta }) => (scritta ? { testo: scritta, colore: "#ffffff", su: 34, scala: 2 } : null),
 };

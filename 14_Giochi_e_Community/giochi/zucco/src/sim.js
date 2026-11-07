@@ -23,7 +23,7 @@ import { PIXEL_PER_PUNTO, caramellaPersa, caramellaPresa, guadagna, lunaAccesa, 
 
 export { ALTEZZA, DURATA_STAGE, IN, LARGHEZZA, SUOLO, TICK, VITE, X_ZUCCO } from "./costanti.js";
 
-export const VERSIONE = 4;
+export const VERSIONE = 5;
 export const CARAMELLE_LUNA = 20;
 
 const DURATA_LUNA = 6;

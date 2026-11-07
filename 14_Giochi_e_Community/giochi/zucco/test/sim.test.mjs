@@ -862,6 +862,177 @@ test("le vite che il boss si riprende non pagano due volte", () => {
   assert.ok(Math.abs(colpo() - 500) < 1e-6, "scendere sotto il minimo sì");
 });
 
+function fuoricampo(s) {
+  s.graziaT = 1;
+  s.boss.proiettili.push(lanciato("teschio", X_ZUCCO + 30));
+  passo(s, [IN.MAZZA]);
+  while (s.zucco.ricarica) passo(s);
+}
+
+/** Un giro come nel gioco vero: due fuoricampo, poi il pipistrello sul boss. */
+function giro(s) {
+  fuoricampo(s);
+  fuoricampo(s);
+  pipistrelloSulBoss(s);
+}
+
+/** Zucco si prende un osso: perde un quarto di vita e il boss se ne riprende una. */
+function colpito(s) {
+  s.graziaT = 0;
+  s.boss.proiettili.push(lanciato("osso", X_ZUCCO + 4));
+  passo(s);
+}
+
+test("i fuoricampo pagano due per ogni vita vera tolta al boss: quelli per ritogliere una vita ripresa no", () => {
+  const { s } = inDuello();
+  s.moltiplicatore = 1;
+  const guadagno = (azione) => {
+    const prima = s.moltiplicatore;
+    azione();
+    return +(s.moltiplicatore - prima).toFixed(2);
+  };
+  assert.equal(guadagno(() => giro(s)), 0.2);
+  colpito(s);
+  assert.equal(s.boss.vite, VITE_BOSS, "il colpo subito lo ha curato");
+  assert.equal(guadagno(() => giro(s)), 0, "toglie solo la vita ripresa");
+  assert.equal(s.boss.homerun, HOMERUN_PER_PIPISTRELLO, "contano comunque per far arrivare i pipistrelli");
+  assert.equal(guadagno(() => giro(s)), 0.2, "una vita nuova paga di nuovo");
+});
+
+test("farsi colpire apposta non conviene, in qualunque ordine si facciano colpo e fuoricampo", () => {
+  const partenza = () => {
+    const { s } = inDuello();
+    giro(s);
+    s.moltiplicatore = 3;
+    return s;
+  };
+  const pulito = partenza();
+  giro(pulito);
+  for (const colpoPrima of [true, false]) {
+    const s = partenza();
+    if (colpoPrima) colpito(s);
+    fuoricampo(s);
+    fuoricampo(s);
+    if (!colpoPrima) colpito(s);
+    pipistrelloSulBoss(s);
+    assert.equal(s.boss.vite, VITE_BOSS - 1, "il boss è solo tornato dov'era");
+    giro(s);
+    assert.equal(s.boss.vite, pulito.boss.vite);
+    const quando = colpoPrima ? "prima" : "dopo";
+    assert.ok(s.moltiplicatore < pulito.moltiplicatore, `colpo ${quando}: ${s.moltiplicatore} contro ${pulito.moltiplicatore}`);
+  }
+});
+
+/** Porta il boss in terza fase, dopo l'Angelo Azzurro e il primo pipistrello: il prossimo apre lo scambio. */
+function versoLoScambio(seed = 1) {
+  const { s, eventi } = inDuello(seed);
+  finoAVite(s, 3);
+  angeloBevuto(s);
+  dopoIlRuggito(s);
+  pipistrelloSulBoss(s);
+  s.boss.prossimoLancio = 999;
+  s.boss.prossimaManata = 999;
+  eventi.length = 0;
+  return { s, eventi };
+}
+
+/** Zucco sulla prima piattaforma, la corsia dei pipistrelli rimandati in `versoLoScambio`. */
+function apriScambio(s) {
+  s.zucco.y = PIATTAFORME[0];
+  s.zucco.vy = 0;
+  s.boss.proiettili.push({ ...lanciato("pipistrello", 245, 1), stato: "ritorno", vx: 520 });
+  passo(s);
+}
+
+/** Zucco resta sul piano e ribatte ogni pipistrello che gli arriva, finché lo scambio dura. */
+function giocaScambio(s) {
+  while (s.boss.scambio) {
+    s.graziaT = 1;
+    const p = s.boss.proiettili.find((q) => q.stato === "vola");
+    passo(s, p && p.x < X_ZUCCO + 30 && p.x > X_ZUCCO + 4 && !s.zucco.ricarica ? [IN.MAZZA] : []);
+  }
+}
+
+test("in terza fase un pipistrello va a segno e il successivo il boss lo ribatte", () => {
+  const { s, eventi } = versoLoScambio();
+  const vite = s.boss.vite;
+  assert.equal(vite, 7, "il primo è andato a segno");
+  assert.ok(!eventi.some((e) => e.tipo === "ribatte"));
+  apriScambio(s);
+  const p = s.boss.proiettili[0];
+  assert.equal(p.stato, "vola", "ribattuto verso Zucco");
+  assert.ok(p.vx < 0);
+  assert.equal(s.boss.scambio.ribattute, 1);
+  assert.equal(s.boss.vite, vite);
+  assert.ok(eventi.some((e) => e.tipo === "scambio") && eventi.some((e) => e.tipo === "ribatte"));
+});
+
+test("durante lo scambio lanci, manate ed Elef si fermano, e ripartono quando finisce", () => {
+  const { s, eventi } = versoLoScambio();
+  s.boss.proiettili.push(lanciato("osso", 200, 0));
+  const manata = { corsia: 0, stato: "va", t: 0, durata: 1, x: 200 };
+  s.boss.manate = [manata];
+  s.boss.prossimoElef = 0.5;
+  apriScambio(s);
+  const attesaElef = s.boss.prossimoElef;
+  assert.equal(s.boss.proiettili.length, 1, "l'osso in volo si è dissolto");
+  assert.ok(eventi.some((e) => e.tipo === "dissolto"));
+  assert.equal(manata.stato, "torna");
+  // Zucco scende a terra: il pipistrello passa sopra di lui, la manata ritirata non lo tocca.
+  s.zucco.y = SUOLO;
+  s.boss.prossimoLancio = 0;
+  const vite = s.vite;
+  while (s.boss.scambio) {
+    s.graziaT = 0;
+    passo(s);
+    assert.equal(s.boss.carica, null, "nessun lancio durante lo scambio");
+    assert.equal(s.boss.elef, null, "Elef aspetta");
+  }
+  assert.equal(s.vite, vite, "schivato: nessun danno");
+  assert.equal(s.boss.prossimoElef, attesaElef);
+  while (!s.boss.carica) passo(s);
+});
+
+test("chi vince lo scambio toglie 2 vite al boss, e se sono vite nuove valgono 500 punti l'una", () => {
+  const { s, eventi } = versoLoScambio();
+  s.moltiplicatore = 1;
+  const vite = s.boss.vite;
+  apriScambio(s);
+  const prima = s.punti;
+  giocaScambio(s);
+  assert.equal(s.boss.vite, vite - 2);
+  assert.equal(s.boss.scritta.testo, "DOPPIO COLPO!");
+  assert.ok(eventi.some((e) => e.tipo === "bossColpito" && e.scritta === "-2"));
+  const mazzate = eventi.filter((e) => e.tipo === "mazzata").length;
+  assert.ok(Math.abs(s.punti - prima - 1000 - 50 * mazzate) < 1e-6);
+});
+
+test("il boss ribatte sempre meno: in media due volte e mezza, mai più di cinque", () => {
+  const ribattute = [];
+  for (let seed = 1; seed <= 200; seed++) {
+    const { s, eventi } = versoLoScambio(seed);
+    apriScambio(s);
+    giocaScambio(s);
+    ribattute.push(eventi.filter((e) => e.tipo === "ribatte").length);
+  }
+  const media = ribattute.reduce((a, b) => a + b, 0) / ribattute.length;
+  assert.ok(Math.max(...ribattute) <= 5);
+  assert.ok(media > 2.2 && media < 2.8, `media ${media}`);
+  assert.ok(ribattute.includes(1) && ribattute.includes(4));
+});
+
+test("se il pipistrello dello scambio colpisce Zucco: un quarto di vita, il boss si cura e lo scambio finisce", () => {
+  const { s } = versoLoScambio();
+  const vite = s.boss.vite;
+  apriScambio(s);
+  while (s.boss.scambio) {
+    s.graziaT = 0;
+    passo(s);
+  }
+  assert.equal(s.vite, VITE - 0.25);
+  assert.equal(s.boss.vite, vite + 1);
+});
+
 test("anche chi sbaglia quasi tutto finisce il duello: le vite di Elef non lo tengono in piedi per sempre", () => {
   for (let seed = 1; seed <= 40; seed++) {
     const s = giocaDuello(seed, { sbaglia: 0.6, distratto: 0.6 });

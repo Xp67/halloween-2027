@@ -346,11 +346,17 @@ const INDICE_BOSS = Object.fromEntries(
   Object.entries(MELODIE_BOSS).map(([nome, note]) => [nome, new Map(note.map(([passo, midi, durata]) => [passo, [midi, durata]]))]),
 );
 
-export function suonaPassoBoss(m, c, frase, passo, t, sedicesimo) {
+export function suonaPassoBoss(m, c, frase, passo, t, sedicesimo, soloBattito = false) {
   const battuta = Math.floor(passo / 16);
   const q = passo % 16;
   const accordo = ACCORDI_BOSS[GIRI_BOSS[frase][battuta]];
   const nota = (midi) => frequenza(midi + c.sposta);
+
+  // Durante lo scambio resta solo il battito: il tema va avanti in silenzio e riprende dov'era.
+  if (soloBattito) {
+    if (q % 4 === 0) cassa(m, t);
+    return;
+  }
 
   // L'organo tiene l'accordo per tutta la battuta.
   if (q === 0)
@@ -606,6 +612,25 @@ export const SUONI = {
     soffio(m, d, { t: t + 0.03, durata: 0.32, vol: 0.16, f: 500, fine: 4000, q: 2 });
     battito(m, d, { forma: "triangle", f: 1318, t: t + 0.1, durata: 0.2, vol: 0.09 });
   },
+  // Il boss ribatte: uno schiaffo secco della mano nera.
+  ribatte(m, d, t) {
+    battito(m, d, { forma: "square", f: 300, fine: 120, t, durata: 0.06, vol: 0.3, filtro: 1800 });
+    soffio(m, d, { t, durata: 0.12, vol: 0.4, f: 1800, fine: 600, q: 1.5 });
+  },
+  // Ogni colpo dello scambio, di Zucco o del boss, suona un tono sopra il precedente.
+  notaScambio(m, d, t, colpi = 1) {
+    const f = 392 * 2 ** ((2 * (colpi - 1)) / 12);
+    battito(m, d, { forma: "triangle", f, t, durata: 0.16, vol: 0.3 });
+    battito(m, d, { f: f * 2, t, durata: 0.08, vol: 0.12 });
+  },
+  // Si apre lo scambio: un tonfo cupo e il resto del duello si zittisce.
+  scambio(m, d, t) {
+    battito(m, d, { forma: "sawtooth", f: 82, fine: 41, t, durata: 0.7, vol: 0.4, filtro: 700 });
+    soffio(m, d, { t, durata: 0.6, vol: 0.3, tipo: "lowpass", f: 1200, fine: 200 });
+  },
+  dissolto(m, d, t) {
+    soffio(m, d, { t, durata: 0.25, vol: 0.18, tipo: "highpass", f: 2000, fine: 6000 });
+  },
   bossColpito(m, d, t) {
     SUONI.urto(m, d, t);
     battito(m, d, { forma: "sawtooth", f: 120, fine: 60, t: t + 0.04, durata: 0.26, vol: 0.14, filtro: 800 });
@@ -737,7 +762,7 @@ const MUSICA_ABBASSATA = 0.4;
 // Il tema del boss non lascia buchi come la marcetta: più basso, e cede di più sotto i colpi.
 const MUSICA_DUELLO = 0.6;
 const DUELLO_ABBASSATO = 0.2;
-const COLPI_FORTI = new Set(["urto", "botta", "ko", "demone", "mano", "rotto", "mazzata", "fuoricampo", "bossAtterra", "bossColpito", "bossMuore", "bossCura", "faseBoss", "manata", "manataAvviso", "angeloBeve", "angeloAzzurro"]);
+const COLPI_FORTI = new Set(["urto", "botta", "ko", "demone", "mano", "rotto", "mazzata", "fuoricampo", "ribatte", "bossAtterra", "bossColpito", "bossMuore", "bossCura", "faseBoss", "manata", "manataAvviso", "angeloBeve", "angeloAzzurro"]);
 // Da dove passa la manata e quanto ci mette: va da destra a sinistra in meno di mezzo secondo.
 const TAPPE_MANATA = [300, 190, 80, -30];
 const PASSO_MANATA = 0.11;
@@ -771,6 +796,7 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
   let inDuello = false;
   let tema = 0;
   let temaVoluto = 0;
+  let scambio = false;
 
   const volume = () => (muto ? 0 : 0.62);
 
@@ -778,7 +804,7 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
     let c = inDuello ? TEMA_BOSS[tema] : STAGE[Math.min(stage, STAGE.length) - 1];
     while (prossimo < ctx.currentTime + 0.14) {
       const sedicesimo = 60 / (c.bpm * (luna ? FATTORE_LUNA : 1)) / 4;
-      if (inDuello) suonaPassoBoss(m, c, FORMA_BOSS[frase], passo, prossimo, sedicesimo);
+      if (inDuello) suonaPassoBoss(m, c, FORMA_BOSS[frase], passo, prossimo, sedicesimo, scambio);
       else suonaPassoCarnevale(m, c, luna, FORMA[frase], passo, prossimo, sedicesimo);
       prossimo += sedicesimo;
       passo++;
@@ -823,7 +849,7 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
       accendiOrologio();
     },
 
-    evento({ tipo, ostacolo, x = ASCOLTO }) {
+    evento({ tipo, ostacolo, x = ASCOLTO, colpi = 0 }) {
       if (!m) return;
       const t = ctx.currentTime;
       if (tipo === "caramella") {
@@ -837,6 +863,7 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
       } else if (tipo === "manata") TAPPE_MANATA.forEach((dove, i) => suona(m, "manata", dove, t + i * PASSO_MANATA, i));
       else if (tipo === "sfiora") suona(m, PASSAGGI[ostacolo] ?? "sfiora", x, t);
       else if (SUONI[tipo]) suona(m, tipo, x, t);
+      if (colpi) suona(m, "notaScambio", x, t, colpi);
       if (COLPI_FORTI.has(tipo) && !inScena) {
         m.musica.gain.setTargetAtTime(inDuello ? DUELLO_ABBASSATO : MUSICA_ABBASSATA, t, 0.008);
         m.musica.gain.setTargetAtTime(inDuello ? MUSICA_DUELLO : MUSICA_ACCESA, t + (TENUTE[tipo] ?? TENUTA_COLPO), 0.12);
@@ -858,6 +885,7 @@ export function creaAudio({ muto: partenzaMuta = false } = {}) {
         prossimo = ctx.currentTime + 0.05;
       }
       if (s.boss) temaVoluto = s.boss.livello;
+      scambio = Boolean(s.boss?.scambio);
       const scena = SCENE_SILENZIOSE.has(fase);
       if (m && orologio && scena !== inScena) {
         inScena = scena;
