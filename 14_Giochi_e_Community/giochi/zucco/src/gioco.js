@@ -13,6 +13,8 @@ const CHIAVE_RECORD = "zucco.record";
 const CHIAVE_MUTO = "zucco.muto";
 const ATTESA_RIGIOCA = 450;
 const ATTESA_AIUTO = 1500;
+// Fa partire dal duello, come ?boss=1: sono partite di prova, senza record né classifica.
+const CODICE_BOSS = "PADRONE";
 
 const MARKUP = `
   <div class="zucco-palco">
@@ -40,6 +42,10 @@ const MARKUP = `
         <p><b>Mazza:</b> nel finale, tasto X o freccia destra. Due homerun fanno arrivare i pipistrelli: solo quelli feriscono il boss. Le mani nere non si parano: cambia piano.</p>
         <p><b>Audio:</b> tasto M o la nota qui accanto. In cuffia si sente da dove arrivano le cose.</p>
         <p><b>Caramelle:</b> con 20 arriva la luna piena e per 6 secondi rompi tutto.</p>
+        <form class="zucco-codice">
+          <input class="zucco-codice-campo" type="text" placeholder="Codice" aria-label="Codice" autocomplete="off" autocapitalize="characters" enterkeyhint="go" spellcheck="false" required />
+          <button class="zucco-codice-vai" type="submit">Vai</button>
+        </form>
       </div>
     </div>
   </div>
@@ -105,7 +111,9 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
   const tastoSuono = trova("suono");
   const tastoMazza = trova("mazza");
   const barraTocco = trova("tocco");
-  const daSecondo = new URLSearchParams(location.search).has("boss") ? TEMPO_BOSS - 1 : 0;
+  const formCodice = trova("codice");
+  const campoCodice = trova("codice-campo");
+  let daSecondo = new URLSearchParams(location.search).has("boss") ? TEMPO_BOSS - 1 : 0;
 
   const movimentoRidotto = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const sprite = await caricaSprite(new URL("../", import.meta.url));
@@ -187,7 +195,8 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
     }
     const dolci = s.caramelle === 1 ? "1 caramella" : `${s.caramelle} caramelle`;
     const esitoPartita = s.vinta ? "Hai battuto il Padrone delle Mani!" : `Stage ${s.stage}:`;
-    mostraPannello("Rigioca", `${nuovoRecord ? "Nuovo record! " : ""}${esitoPartita} ${punti} punti, ${dolci}`);
+    const fuori = s.prova ? " (prova, fuori classifica)" : "";
+    mostraPannello("Rigioca", `${nuovoRecord ? "Nuovo record! " : ""}${esitoPartita} ${punti} punti, ${dolci}${fuori}`);
     if (nuovoRecord) tabellone.proponi(risultato(s));
     if (!risultatoInviato) alTermine(risultato(s));
     risultatoInviato = false;
@@ -294,6 +303,21 @@ export async function avviaGioco(radice, { seme = nuovoSeme, alTermine = () => {
     if (e.pointerType === "mouse") timerAiuto = setTimeout(() => mostraAiuto(true), ATTESA_AIUTO);
   });
   aiuto.addEventListener("pointerleave", () => clearTimeout(timerAiuto));
+
+  campoCodice.addEventListener("input", () => campoCodice.setCustomValidity(""));
+  formCodice.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (campoCodice.value.trim().toUpperCase() !== CODICE_BOSS) {
+      campoCodice.setCustomValidity("Codice sbagliato");
+      campoCodice.reportValidity();
+      return;
+    }
+    // Vale fino a quando si ricarica la pagina: anche Rigioca riparte dal duello.
+    daSecondo = TEMPO_BOSS - 1;
+    campoCodice.value = "";
+    campoCodice.blur();
+    inizia();
+  });
 
   function adatta() {
     const { width, height } = palco.getBoundingClientRect();

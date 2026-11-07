@@ -109,7 +109,8 @@ body {
 .zucco-suono:focus-visible,
 .zucco-tabella:focus-visible,
 .zucco-aiuto:focus-visible,
-.zucco-salva:focus-visible {
+.zucco-salva:focus-visible,
+.zucco-codice-vai:focus-visible {
   outline: 3px solid var(--zucco-testo);
   outline-offset: 2px;
 }
@@ -137,7 +138,8 @@ body {
   color: var(--zucco-testo) !important;
 }
 
-.zucco-nome {
+.zucco-nome,
+.zucco-codice {
   display: flex;
   gap: 8px;
   max-width: 100%;
@@ -147,8 +149,13 @@ body {
   display: none;
 }
 
+.zucco-codice {
+  margin-top: 10px;
+}
+
 /* Sotto i 16px iPhone ingrandisce la pagina, e senza user-select il campo su Safari non si lascia scrivere. */
-.zucco-campo {
+.zucco-campo,
+.zucco-codice-campo {
   box-sizing: border-box;
   width: 18ch;
   min-width: 0;
@@ -164,16 +171,19 @@ body {
   -webkit-user-select: text;
 }
 
-.zucco-campo::placeholder {
+.zucco-campo::placeholder,
+.zucco-codice-campo::placeholder {
   color: #9b92b5;
 }
 
-.zucco-campo:focus {
+.zucco-campo:focus,
+.zucco-codice-campo:focus {
   border-color: var(--zucco-arancio);
   outline: none;
 }
 
-.zucco-salva {
+.zucco-salva,
+.zucco-codice-vai {
   padding: 8px 14px;
   font-size: 18px !important;
   background: var(--zucco-arancio);

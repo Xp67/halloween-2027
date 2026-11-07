@@ -66,7 +66,7 @@ Nel duello la vista torna tutta a sinistra e Zucco sta a 56 px dal bordo: a dest
 
 Comandi: salto per salire, giù per scendere di un piano, tasto X o freccia destra per la mazza. Su telefono compare il tasto Mazza.
 
-Per provare il finale senza giocare 200 secondi: aggiungere `?boss=1` all'indirizzo. Queste partite non salvano il record e il risultato resta segnato come prova.
+Per provare il finale senza giocare 200 secondi: aggiungere `?boss=1` all'indirizzo, oppure scrivere il codice `PADRONE` nel pannello «?» (costante `CODICE_BOSS` in `src/gioco.js`; vale fino a quando si ricarica la pagina, anche per Rigioca). Queste partite non salvano il record, non propongono la classifica e il risultato resta segnato come prova: il server le rifiuterebbe comunque, perché rigioca da capo.
 
 ### Mani nere e orda
 
