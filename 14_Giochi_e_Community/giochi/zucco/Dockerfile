@@ -11,6 +11,13 @@ COPY src /usr/share/nginx/html/src
 COPY assets /usr/share/nginx/html/assets
 COPY --from=pixelfx /pixelfx/src /usr/share/nginx/html/node_modules/pixelfx/src
 COPY --from=pixelfx /pixelfx/LICENSE /usr/share/nginx/html/node_modules/pixelfx/LICENSE
+# Cloudflare tiene in cache del browser per 4 ore i .js e i .css, anche se nginx dice no-cache: la pagina
+# carica moduli, stile e sprite da /v/<impronta>/, un percorso nuovo a ogni versione. I moduli si importano
+# tra loro con percorsi relativi e gli sprite stanno in ../assets: tutto resta sotto lo stesso /v/<impronta>/.
+RUN cd /usr/share/nginx/html \
+ && V=$(find src assets stile.css -type f | sort | xargs cat | md5sum | cut -c1-10) \
+ && sed -i -e "s|\"./src/|\"./v/$V/src/|g" -e "s|href=\"stile.css\"|href=\"v/$V/stile.css\"|" index.html \
+ && grep -q "/v/$V/src/gioco.js" index.html
 
 # La classifica della versione di prova: rigioca le partite con lo stesso sim.js del browser.
 FROM node:22-alpine AS classifica
