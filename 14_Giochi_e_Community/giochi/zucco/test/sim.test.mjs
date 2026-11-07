@@ -961,7 +961,121 @@ test("tenere premuto salta più in alto di un tocco breve", () => {
   const lungo = altezza(40);
   assert.ok(corto > TIPI.lapide.h, `il salto corto (${corto.toFixed(0)}) deve superare una lapide`);
   assert.ok(lungo > TIPI.demone.h + 10, `il salto pieno (${lungo.toFixed(0)}) deve superare il demone`);
-  assert.ok(lungo > corto + 15);
+  assert.ok(lungo > corto + 10);
+});
+
+/** Salto pieno, poi una seconda pressione `anticipo` tick prima di toccare terra, tenuta `tenuta` tick. Torna l'altezza del salto che ne esce. */
+function secondoSalto(anticipo, tenuta) {
+  const prova = creaPartita(1);
+  prova.daGenerare = Infinity;
+  passo(prova, [IN.SALTO_GIU]);
+  let volo = 0;
+  for (; prova.zucco.y < SUOLO; volo++) passo(prova);
+  const s = creaPartita(1);
+  s.daGenerare = Infinity;
+  const premo = volo - anticipo + 1;
+  let cima = SUOLO;
+  let atterrato = false;
+  for (let i = 0; i < 110; i++) {
+    const comandi = [];
+    if (i === 0 || i === premo) comandi.push(IN.SALTO_GIU);
+    if (i === premo + tenuta) comandi.push(IN.SALTO_SU);
+    passo(s, comandi);
+    if (i > 2 && s.zucco.y >= SUOLO) atterrato = true;
+    if (atterrato) cima = Math.min(cima, s.zucco.y);
+  }
+  return SUOLO - cima;
+}
+
+const SALTO_MINIMO = 34;
+
+test("un tocco rapido fa sempre un salto vero, ma passa ancora sotto il pipistrello alto", () => {
+  for (const rilascio of [0, 1, 2, 3, 5]) {
+    const s = creaPartita(1);
+    s.daGenerare = Infinity;
+    let cima = SUOLO;
+    for (let i = 0; i < 60; i++) {
+      const comandi = [];
+      if (i === 0) comandi.push(IN.SALTO_GIU);
+      if (i === rilascio) comandi.push(IN.SALTO_SU);
+      passo(s, comandi);
+      cima = Math.min(cima, s.zucco.y);
+    }
+    assert.ok(SUOLO - cima > SALTO_MINIMO, `tasto tenuto ${rilascio} tick: ${(SUOLO - cima).toFixed(1)} px`);
+    assert.ok(SUOLO - cima < 43, `tasto tenuto ${rilascio} tick: ${(SUOLO - cima).toFixed(1)} px, sbatte contro il pipistrello alto`);
+  }
+});
+
+test("premuto poco prima di atterrare, Zucco salta davvero anche se il tasto è già stato lasciato", () => {
+  for (const anticipo of [1, 4, 7, 10, 12])
+    for (const tenuta of [1, 3, 5]) {
+      if (tenuta >= anticipo) continue;
+      const alto = secondoSalto(anticipo, tenuta);
+      assert.ok(alto > SALTO_MINIMO, `${anticipo} tick prima, tenuto ${tenuta}: ${alto.toFixed(1)} px`);
+    }
+});
+
+test("premuto in volo e tenuto giù, Zucco salta appena tocca terra, anche se ha premuto molto prima", () => {
+  for (const anticipo of [13, 18, 25]) {
+    const alto = secondoSalto(anticipo, 40);
+    assert.ok(alto > TIPI.demone.h + 10, `${anticipo} tick prima: ${alto.toFixed(1)} px`);
+  }
+});
+
+test("premuto troppo presto e lasciato, in volo non resta nessun salto in sospeso", () => {
+  assert.equal(secondoSalto(25, 3), 0);
+});
+
+test("il tasto tenuto dal primo salto non fa ripartire Zucco da solo", () => {
+  const s = creaPartita(1);
+  s.daGenerare = Infinity;
+  passo(s, [IN.SALTO_GIU]);
+  for (let i = 0; i < 39; i++) passo(s);
+  assert.equal(s.zucco.y, SUOLO);
+  for (let i = 0; i < 20; i++) {
+    passo(s);
+    assert.equal(s.zucco.y, SUOLO);
+  }
+});
+
+test("dalla scivolata il salto parte pieno quanto un tocco rapido, anche col tasto giù ancora premuto", () => {
+  const s = creaPartita(1);
+  s.daGenerare = Infinity;
+  passo(s, [IN.SCIVOLA_GIU]);
+  passo(s);
+  passo(s, [IN.SALTO_GIU]);
+  let cima = SUOLO;
+  for (let i = 0; i < 40; i++) {
+    passo(s, i === 3 ? [IN.SALTO_SU] : []);
+    cima = Math.min(cima, s.zucco.y);
+  }
+  assert.ok(SUOLO - cima > TIPI.croce.h, `salto di ${(SUOLO - cima).toFixed(1)} px`);
+});
+
+test("nel duello il tasto premuto in volo e tenuto fa saltare appena Zucco tocca un piano", () => {
+  const { s, eventi } = inDuello();
+  const salti = () => eventi.filter((e) => e.tipo === "salto").length;
+  passo(s, [IN.SALTO_GIU]);
+  passo(s, [IN.SALTO_SU]);
+  for (let i = 0; i < 3; i++) passo(s);
+  passo(s, [IN.SALTO_GIU]);
+  assert.equal(salti(), 1);
+  for (let i = 0; i < 60; i++) passo(s);
+  assert.equal(salti(), 2);
+});
+
+test("nel duello un tocco rapido arriva al piano di sopra, da terra e dalla piattaforma", () => {
+  const { s } = inDuello();
+  s.boss.prossimoElef = 1e9;
+  const tocco = () => {
+    passo(s, [IN.SALTO_GIU]);
+    passo(s, [IN.SALTO_SU]);
+    for (let i = 0; i < 50; i++) passo(s);
+  };
+  tocco();
+  assert.equal(s.zucco.y, PIATTAFORME[0]);
+  tocco();
+  assert.equal(s.zucco.y, PIATTAFORME[1]);
 });
 
 test("venti caramelle accendono la luna piena e gli ostacoli si rompono", () => {

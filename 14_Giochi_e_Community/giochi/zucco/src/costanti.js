@@ -14,8 +14,10 @@ export const GRAVITA = 1150;
 export const SPINTA = -345;
 export const TAGLIO_SALTO = -150;
 export const GRAVITA_PICCHIATA = 2.4;
-export const BUFFER_SALTO = 7;
+export const BUFFER_SALTO = 12;
 export const TOLLERANZA_BORDO = 5;
+// Per questi tick il salto sale comunque, anche col tasto già lasciato: un tocco rapido deve bastare a saltare.
+export const SPINTA_MINIMA = 6;
 export const GRAZIA_COLPO = 1.5;
 
 // La mazza a ogni tick dello swing, in gradi: fa un giro intero, dalla spalla giù dietro Zucco, orizzontale

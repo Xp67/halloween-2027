@@ -4,6 +4,7 @@
 import { TEMPO_BOSS, iniziaBoss, mazzata, passoBoss } from "./boss.js";
 import {
   BUFFER_SALTO,
+  SPINTA_MINIMA,
   DURATA_STAGE,
   GRAVITA,
   GRAVITA_PICCHIATA,
@@ -22,7 +23,7 @@ import { PIXEL_PER_PUNTO, caramellaPersa, caramellaPresa, guadagna, lunaAccesa, 
 
 export { ALTEZZA, DURATA_STAGE, IN, LARGHEZZA, SUOLO, TICK, VITE, X_ZUCCO } from "./costanti.js";
 
-export const VERSIONE = 3;
+export const VERSIONE = 4;
 export const CARAMELLE_LUNA = 20;
 
 const DURATA_LUNA = 6;
@@ -38,7 +39,7 @@ const CARAMELLA_SALTATA = 18;
 const ZUCCO_IN_PIEDI = { w: 12, h: 24 };
 const ZUCCO_SCIVOLA = { w: 18, h: 12 };
 
-// `alta` è tarata sul tocco di un dito (~100 ms, salto di ~42 px): passa il salto corto, non quello pieno.
+// `alta` passa sopra il salto minimo (36 px), non sopra quello pieno.
 const QUOTE_PIPISTRELLO = { bassa: SUOLO - 10, media: SUOLO - 24, alta: SUOLO - 76 };
 
 export const TIPI = {
@@ -120,7 +121,7 @@ export function creaPartita(seed, alEvento = () => {}, { daSecondo = 0 } = {}) {
     input: [],
     tieniSalto: false,
     tieniGiu: false,
-    zucco: { y: SUOLO, vy: 0, buffer: 0, bordo: TOLLERANZA_BORDO, stato: "corsa" },
+    zucco: { y: SUOLO, vy: 0, buffer: 0, bordo: TOLLERANZA_BORDO, spinta: 0, stato: "corsa" },
   };
 }
 
@@ -170,20 +171,23 @@ function muoviZucco(s) {
   const aTerra = z.y >= SUOLO;
   z.bordo = aTerra ? TOLLERANZA_BORDO : Math.max(0, z.bordo - 1);
 
+  // Premuto in volo: finché il tasto resta giù la richiesta non scade, e parte appena Zucco tocca terra.
   if (z.buffer > 0) {
-    z.buffer--;
+    if (!s.tieniSalto) z.buffer--;
     if (z.bordo > 0) {
       z.vy = SPINTA;
       z.y = SUOLO - 0.01;
       z.bordo = 0;
       z.buffer = 0;
+      z.spinta = SPINTA_MINIMA;
       s.alEvento({ tipo: "salto", x: X_ZUCCO, y: SUOLO });
     }
   }
 
   if (z.y < SUOLO) {
-    if (!s.tieniSalto && z.vy < TAGLIO_SALTO) z.vy = TAGLIO_SALTO;
-    z.vy += GRAVITA * (s.tieniGiu ? GRAVITA_PICCHIATA : 1) * TICK;
+    if (!s.tieniSalto && z.spinta === 0 && z.vy < TAGLIO_SALTO) z.vy = TAGLIO_SALTO;
+    z.vy += GRAVITA * (s.tieniGiu && z.spinta === 0 ? GRAVITA_PICCHIATA : 1) * TICK;
+    z.spinta = Math.max(0, z.spinta - 1);
     z.y += z.vy * TICK;
     if (z.y >= SUOLO) {
       z.y = SUOLO;

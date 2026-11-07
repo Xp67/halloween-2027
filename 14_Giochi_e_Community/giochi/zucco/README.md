@@ -15,6 +15,7 @@ npm test      # logica di gioco, compresi i bot che misurano la durata delle par
 | | |
 |---|---|
 | Comandi | Salto (tenere premuto per saltare più in alto), scivolata, in aria la scivolata fa scendere prima |
+| Salto | Un tocco rapido fa sempre un salto vero: 36 px nella corsa, abbastanza per il piano di sopra nel duello. Premuto in volo vale per 200 ms dopo il rilascio, o finché il tasto resta giù, e parte appena Zucco tocca terra |
 | Tastiera | Spazio, freccia su, W per saltare; freccia giù, S per scivolare; Esc o P per la pausa |
 | Telefono | Tasti Salta e Scivola; toccare il gioco fa saltare |
 | Vite | 3. Ogni colpo fa esplodere l'ostacolo e dà 1,5 secondi di invulnerabilità. Nel duello col boss si perdono a frazioni: 1/4 per un lancio, 1/2 per una manata |

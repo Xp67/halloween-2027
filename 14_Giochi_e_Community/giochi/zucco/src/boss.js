@@ -29,6 +29,8 @@ export const PIATTAFORME = [SUOLO - 40, SUOLO - 80];
 export const CORSIE = [SUOLO - 14, PIATTAFORME[0] - 14, PIATTAFORME[1] - 14];
 export const X_PIATTAFORMA = X_ZUCCO - 26;
 export const LARGO_PIATTAFORMA = 60;
+// I piani stanno a 40 px: nel duello anche un tocco rapido deve arrivare a quello sopra.
+const SPINTA_MINIMA_DUELLO = 8;
 
 const FRENATA = 140;
 const VELOCITA_PASSO = 50;
@@ -199,12 +201,13 @@ function muoviDuello(s) {
   z.bordo = appoggio ? TOLLERANZA_BORDO : Math.max(0, z.bordo - 1);
 
   if (z.buffer > 0) {
-    z.buffer--;
+    if (!s.tieniSalto) z.buffer--;
     if (z.bordo > 0) {
       z.vy = SPINTA;
       z.y -= 0.01;
       z.bordo = 0;
       z.buffer = 0;
+      z.spinta = SPINTA_MINIMA_DUELLO;
       s.alEvento({ tipo: "salto", x: X_ZUCCO, y: z.y });
     }
   }
@@ -217,8 +220,9 @@ function muoviDuello(s) {
 
   if (!PIATTAFORME.includes(z.y) && z.y !== SUOLO) {
     const prima = z.y;
-    if (!s.tieniSalto && z.vy < TAGLIO_SALTO) z.vy = TAGLIO_SALTO;
-    z.vy += GRAVITA * (s.tieniGiu ? GRAVITA_PICCHIATA : 1) * TICK;
+    if (!s.tieniSalto && z.spinta === 0 && z.vy < TAGLIO_SALTO) z.vy = TAGLIO_SALTO;
+    z.vy += GRAVITA * (s.tieniGiu && z.spinta === 0 ? GRAVITA_PICCHIATA : 1) * TICK;
+    z.spinta = Math.max(0, z.spinta - 1);
     z.y += z.vy * TICK;
     for (const piano of [PIATTAFORME[1], PIATTAFORME[0], SUOLO])
       if (piano !== z.ignora && z.vy > 0 && prima <= piano && z.y >= piano) {
