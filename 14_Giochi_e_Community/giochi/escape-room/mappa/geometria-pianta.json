@@ -1,0 +1,308 @@
+{
+  "larghezza": 720,
+  "altezza": 760,
+  "scala": 20,
+  "stanze": {
+    "cancello": {
+      "piano": "piano-terra",
+      "centro": [
+        140,
+        656
+      ],
+      "zone": [
+        [
+          60,
+          600,
+          220,
+          100
+        ],
+        [
+          180,
+          340,
+          40,
+          260
+        ],
+        [
+          220,
+          520,
+          60,
+          80
+        ]
+      ]
+    },
+    "ingresso": {
+      "piano": "piano-terra",
+      "centro": [
+        170,
+        316
+      ],
+      "zone": [
+        [
+          140,
+          240,
+          140,
+          100
+        ],
+        [
+          280,
+          240,
+          40,
+          60
+        ]
+      ]
+    },
+    "deposito": {
+      "piano": "piano-terra",
+      "centro": [
+        250,
+        430
+      ],
+      "zone": [
+        [
+          220,
+          340,
+          60,
+          180
+        ]
+      ]
+    },
+    "sala-principale": {
+      "piano": "piano-terra",
+      "centro": [
+        430,
+        180
+      ],
+      "zone": [
+        [
+          280,
+          60,
+          300,
+          180
+        ]
+      ]
+    },
+    "sala-bar": {
+      "piano": "piano-terra",
+      "centro": [
+        330,
+        224
+      ],
+      "zone": [
+        [
+          280,
+          180,
+          100,
+          60
+        ]
+      ]
+    },
+    "corridoio": {
+      "piano": "piano-terra",
+      "centro": [
+        410,
+        296
+      ],
+      "zone": [
+        [
+          320,
+          240,
+          260,
+          60
+        ]
+      ]
+    },
+    "area-fumatori": {
+      "piano": "piano-terra",
+      "centro": [
+        620,
+        210
+      ],
+      "zone": [
+        [
+          580,
+          100,
+          80,
+          200
+        ],
+        [
+          600,
+          300,
+          60,
+          20
+        ],
+        [
+          600,
+          320,
+          20,
+          60
+        ]
+      ]
+    },
+    "sala-del-tesoro": {
+      "piano": "primo-piano",
+      "centro": [
+        310,
+        470
+      ],
+      "zone": [
+        [
+          260,
+          280,
+          240,
+          240
+        ]
+      ]
+    }
+  },
+  "porte": [
+    {
+      "tra": [
+        "cancello",
+        "ingresso"
+      ],
+      "punti": [
+        [
+          200,
+          340
+        ],
+        [
+          200,
+          340
+        ]
+      ],
+      "versi": [
+        "su",
+        "giu"
+      ]
+    },
+    {
+      "tra": [
+        "ingresso",
+        "deposito"
+      ],
+      "punti": [
+        [
+          270,
+          340
+        ],
+        [
+          270,
+          340
+        ]
+      ],
+      "versi": [
+        "giu",
+        "su"
+      ]
+    },
+    {
+      "tra": [
+        "ingresso",
+        "sala-principale"
+      ],
+      "punti": [
+        [
+          300,
+          240
+        ],
+        [
+          300,
+          240
+        ]
+      ],
+      "versi": [
+        "su",
+        "giu"
+      ]
+    },
+    {
+      "tra": [
+        "sala-principale",
+        "sala-bar"
+      ],
+      "punti": [
+        [
+          360,
+          192
+        ],
+        [
+          360,
+          192
+        ]
+      ],
+      "versi": [
+        "giu",
+        "su"
+      ]
+    },
+    {
+      "tra": [
+        "ingresso",
+        "corridoio"
+      ],
+      "punti": [
+        [
+          320,
+          288
+        ],
+        [
+          320,
+          288
+        ]
+      ],
+      "versi": [
+        "dx",
+        "sx"
+      ]
+    },
+    {
+      "tra": [
+        "corridoio",
+        "area-fumatori"
+      ],
+      "punti": [
+        [
+          580,
+          288
+        ],
+        [
+          580,
+          288
+        ]
+      ],
+      "versi": [
+        "dx",
+        "sx"
+      ]
+    },
+    {
+      "tra": [
+        "ingresso",
+        "sala-del-tesoro"
+      ],
+      "punti": [
+        [
+          212,
+          290
+        ],
+        [
+          252,
+          290
+        ]
+      ],
+      "versi": [
+        "dx",
+        "sx"
+      ],
+      "salita": true
+    }
+  ],
+  "premio": {
+    "stanza": "sala-del-tesoro",
+    "punto": [
+      450,
+      460
+    ],
+    "verso": "giu"
+  }
+}
