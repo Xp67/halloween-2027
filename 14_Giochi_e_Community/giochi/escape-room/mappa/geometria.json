@@ -1,0 +1,470 @@
+{
+  "versione": 2,
+  "larghezza": 320,
+  "altezza": 2852,
+  "schermo": [
+    320,
+    200
+  ],
+  "scala": 20,
+  "stanze": {
+    "anticancello": {
+      "nome": "La strada",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        0,
+        320,
+        200
+      ],
+      "centro": [
+        160,
+        78
+      ]
+    },
+    "cancello": {
+      "nome": "Cancello",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        200,
+        320,
+        200
+      ],
+      "centro": [
+        140,
+        128
+      ]
+    },
+    "vialetto": {
+      "nome": "Vialetto",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        400,
+        320,
+        200
+      ],
+      "centro": [
+        160,
+        132
+      ]
+    },
+    "ingresso": {
+      "nome": "Ingresso",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        600,
+        320,
+        232
+      ],
+      "centro": [
+        140,
+        164
+      ]
+    },
+    "antisala": {
+      "nome": "Anti-sala",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        832,
+        320,
+        200
+      ],
+      "centro": [
+        160,
+        148
+      ]
+    },
+    "deposito": {
+      "nome": "Deposito",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        1032,
+        320,
+        200
+      ],
+      "centro": [
+        160,
+        128
+      ]
+    },
+    "sala-principale": {
+      "nome": "Sala principale",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        1232,
+        320,
+        520
+      ],
+      "centro": [
+        148,
+        344
+      ]
+    },
+    "sala-bar": {
+      "nome": "Sala Bar",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        1752,
+        320,
+        200
+      ],
+      "centro": [
+        140,
+        128
+      ]
+    },
+    "corridoio-bagni": {
+      "nome": "Corridoio dei bagni",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        1952,
+        320,
+        200
+      ],
+      "centro": [
+        160,
+        152
+      ]
+    },
+    "corridoio-spogliatoi": {
+      "nome": "Corridoio degli spogliatoi",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        2152,
+        320,
+        200
+      ],
+      "centro": [
+        160,
+        152
+      ]
+    },
+    "area-fumatori": {
+      "nome": "Area Fumatori",
+      "piano": "piano-terra",
+      "riquadro": [
+        0,
+        2352,
+        320,
+        300
+      ],
+      "centro": [
+        156,
+        176
+      ]
+    },
+    "sala-del-tesoro": {
+      "nome": "Sala del tesoro",
+      "piano": "primo-piano",
+      "riquadro": [
+        0,
+        2652,
+        320,
+        200
+      ],
+      "centro": [
+        160,
+        132
+      ]
+    }
+  },
+  "porte": [
+    {
+      "tra": [
+        "anticancello",
+        "cancello"
+      ],
+      "punti": [
+        [
+          80,
+          58
+        ],
+        [
+          80,
+          184
+        ]
+      ],
+      "versi": [
+        "su",
+        "giu"
+      ]
+    },
+    {
+      "tra": [
+        "cancello",
+        "vialetto"
+      ],
+      "punti": [
+        [
+          252,
+          44
+        ],
+        [
+          160,
+          188
+        ]
+      ],
+      "versi": [
+        "su",
+        "giu"
+      ]
+    },
+    {
+      "tra": [
+        "vialetto",
+        "ingresso"
+      ],
+      "punti": [
+        [
+          160,
+          44
+        ],
+        [
+          160,
+          216
+        ]
+      ],
+      "versi": [
+        "su",
+        "giu"
+      ]
+    },
+    {
+      "tra": [
+        "ingresso",
+        "antisala"
+      ],
+      "punti": [
+        [
+          60,
+          58
+        ],
+        [
+          160,
+          184
+        ]
+      ],
+      "versi": [
+        "su",
+        "giu"
+      ]
+    },
+    {
+      "tra": [
+        "ingresso",
+        "deposito"
+      ],
+      "punti": [
+        [
+          300,
+          84
+        ],
+        [
+          20,
+          88
+        ]
+      ],
+      "versi": [
+        "dx",
+        "sx"
+      ]
+    },
+    {
+      "tra": [
+        "antisala",
+        "sala-principale"
+      ],
+      "punti": [
+        [
+          20,
+          148
+        ],
+        [
+          300,
+          452
+        ]
+      ],
+      "versi": [
+        "sx",
+        "dx"
+      ]
+    },
+    {
+      "tra": [
+        "sala-principale",
+        "sala-bar"
+      ],
+      "punti": [
+        [
+          224,
+          288
+        ],
+        [
+          20,
+          128
+        ]
+      ],
+      "versi": [
+        "dx",
+        "sx"
+      ],
+      "zoom": [
+        188,
+        236,
+        128,
+        80
+      ]
+    },
+    {
+      "tra": [
+        "antisala",
+        "corridoio-bagni"
+      ],
+      "punti": [
+        [
+          300,
+          152
+        ],
+        [
+          20,
+          152
+        ]
+      ],
+      "versi": [
+        "dx",
+        "sx"
+      ]
+    },
+    {
+      "tra": [
+        "corridoio-bagni",
+        "corridoio-spogliatoi"
+      ],
+      "punti": [
+        [
+          300,
+          152
+        ],
+        [
+          20,
+          152
+        ]
+      ],
+      "versi": [
+        "dx",
+        "sx"
+      ]
+    },
+    {
+      "tra": [
+        "corridoio-spogliatoi",
+        "area-fumatori"
+      ],
+      "punti": [
+        [
+          300,
+          152
+        ],
+        [
+          20,
+          176
+        ]
+      ],
+      "versi": [
+        "dx",
+        "sx"
+      ]
+    },
+    {
+      "tra": [
+        "ingresso",
+        "sala-del-tesoro"
+      ],
+      "punti": [
+        [
+          160,
+          126
+        ],
+        [
+          40,
+          178
+        ]
+      ],
+      "versi": [
+        "su",
+        "giu"
+      ],
+      "salita": true
+    }
+  ],
+  "premio": {
+    "stanza": "sala-del-tesoro",
+    "punto": [
+      296,
+      132
+    ],
+    "verso": "dx"
+  },
+  "serrature": {
+    "stanza": "ingresso",
+    "posti": [
+      [
+        160,
+        19
+      ],
+      [
+        169,
+        24
+      ],
+      [
+        169,
+        34
+      ],
+      [
+        160,
+        39
+      ],
+      [
+        151,
+        34
+      ],
+      [
+        151,
+        24
+      ]
+    ],
+    "colori": [
+      "#8a5ad0",
+      "#f59a2e",
+      "#2fa35a",
+      "#d03a2c",
+      "#2a6cff",
+      "#37d6c2"
+    ],
+    "portone": [
+      134,
+      15,
+      52,
+      29
+    ],
+    "davanti": [
+      160,
+      72
+    ],
+    "zoom": [
+      120,
+      4,
+      80,
+      50
+    ]
+  }
+}

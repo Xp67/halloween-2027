@@ -14,6 +14,8 @@ Dove e come gira il sito (biglietti, PR, giochi). *Proposta del 2026-11-04, da c
 
 Se ELEFIX va giù o si aggiorna, il sito resta online; vale anche il contrario. L'unica cosa in comune è la macchina: CPU, RAM e disco.
 
+**Eccezione provvisoria (2026-11-05):** il gioco [La fuga di Zucco](../14_Giochi_e_Community/giochi/zucco/README.md) sta su `zucco.getinvolvd.com` come container accanto a ELEFIX, sulla rete `elefix_proxy` e con l'etichetta di Caddy. Sono solo file statici. Quando il sito GetInvolved è online il gioco si sposta lì, come pagina del sito, e il container si toglie.
+
 ## Schema
 
 ```

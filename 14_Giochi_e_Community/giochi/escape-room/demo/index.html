@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Demo dei rompicapi</title>
+<style>
+  :root { --fondo: #0b0714; --testo: #fff3b0; --arancio: #f59a2e; --arancio-chiaro: #ffd07a; --bordo: #160f1e; --carta: #1c1230; --viola-chiaro: #7b55c4; }
+  html, body { margin: 0; background: var(--fondo); color: var(--testo); font-family: "Courier New", ui-monospace, monospace; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { margin: 0 0 4px; color: var(--arancio); text-shadow: 2px 2px 0 var(--bordo); }
+  h2 { margin: 28px 0 10px; font-size: 1.05em; color: var(--arancio-chiaro); text-transform: uppercase; letter-spacing: 0.05em; }
+  .griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  a.demo { display: block; color: inherit; text-decoration: none; background: var(--carta); border: 3px solid var(--bordo); box-shadow: inset 0 0 0 2px var(--viola-chiaro); }
+  a.demo:hover, a.demo:focus-visible { box-shadow: inset 0 0 0 2px var(--arancio); outline: none; }
+  a.demo img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; image-rendering: pixelated; background: #030104; }
+  a.demo span { display: block; padding: 8px 10px; font-weight: 700; }
+  a.demo small { display: block; padding: 0 10px 8px; color: var(--arancio-chiaro); font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Demo dei rompicapi</h1>
+  <div id="stanze"></div>
+</main>
+<script>
+  // Le demo dei rompicapi approvati, per stanza. Le anteprime sono le foto di comune/prova.mjs (se ci sono).
+  const DEMO = [
+    ["Cancello", "lucchetto-lapidi", "Il lucchetto delle lapidi"],
+    ["Cancello", "corvi-spaventapasseri", "I corvi dello spaventapasseri"],
+    ["Cancello", "lanterna-cortile", "La lanterna del cortile"],
+    ["Ingresso", "zucche-di-piombo", "La zucca vuota"],
+    ["Ingresso", "ritratto-in-pezzi", "Il ritratto in pezzi"],
+    ["Ingresso", "otto-candelabri", "Gli otto candelabri"],
+    ["Ingresso", "conto-guardaroba", "Il conto del guardaroba"],
+    ["Deposito", "casse-deposito", "I bauli del deposito"],
+    ["Deposito", "teli-che-mentono", "I teli che mentono"],
+    ["Deposito", "armadio-combinazione", "L'armadio a combinazione"],
+    ["Sala principale", "casse-consolle", "Le casse della consolle"],
+    ["Sala principale", "pista-si-spegne", "La pista che si spegne"],
+    ["Sala Bar", "angelo-azzurro", "L'Angelo Azzurro"],
+    ["Sala Bar", "shottino-avvelenato", "Lo shottino avvelenato"],
+    ["Area Fumatori", "clessidre-fungo", "Le clessidre del fungo"],
+    ["Sala del tesoro", "cinque-tombe", "Le cinque tombe"],
+    ["Sala del tesoro", "caramella-solitaria", "La caramella solitaria"],
+    ["Stanza da assegnare", "ascensore-prive", "L'ascensore del privé"],
+  ];
+  const radice = document.getElementById("stanze");
+  for (const stanza of [...new Set(DEMO.map((d) => d[0]))]) {
+    const h = document.createElement("h2");
+    h.textContent = stanza;
+    const griglia = document.createElement("div");
+    griglia.className = "griglia";
+    for (const [, id, titolo] of DEMO.filter((d) => d[0] === stanza)) {
+      const a = document.createElement("a");
+      a.className = "demo";
+      a.href = `${id}/index.html`;
+      const img = document.createElement("img");
+      img.alt = "";
+      img.loading = "lazy";
+      img.src = `${id}/foto/desktop.png`;
+      img.onerror = () => img.remove();
+      const t = document.createElement("span");
+      t.textContent = titolo;
+      a.append(img, t);
+      griglia.append(a);
+    }
+    radice.append(h, griglia);
+  }
+</script>
+</body>
+</html>
