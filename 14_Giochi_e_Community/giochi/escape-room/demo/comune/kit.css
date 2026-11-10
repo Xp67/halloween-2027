@@ -1,0 +1,479 @@
+/* Kit comune delle demo dei rompicapi: stessi colori e bottoni della fuga di Zucco (giochi/zucco/stile.css). */
+:root {
+  --kit-fondo: #0b0714;
+  --kit-testo: #fff3b0;
+  --kit-arancio: #f59a2e;
+  --kit-arancio-scuro: #9c3b17;
+  --kit-arancio-chiaro: #ffd07a;
+  --kit-viola: #2e1b52;
+  --kit-viola-chiaro: #7b55c4;
+  --kit-bordo: #160f1e;
+  --kit-rosso: #d03a2c;
+  --kit-carta: #1c1230;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--kit-fondo);
+  overflow: hidden;
+}
+
+.kit-radice {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: "Courier New", ui-monospace, monospace;
+  color: var(--kit-testo);
+  background: var(--kit-fondo);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Sfocato e scuro: fa da luce ambiente, senza doppioni riconoscibili della stanza. */
+.kit-fondale {
+  position: absolute;
+  inset: -48px;
+  background-color: var(--kit-fondo);
+  background-position: center 30%;
+  background-size: cover;
+  filter: blur(18px) brightness(0.4) saturate(0.8);
+}
+
+.kit-radice.kit-fuori .kit-fondale {
+  filter: blur(18px) brightness(0.25) saturate(0.7);
+}
+
+.kit-radice.kit-telefono .kit-fondale {
+  display: none;
+}
+
+/* Barre fuori dalla scena: sopra e sotto, con il testo a misura fissa. */
+.kit-radice.kit-fuori .kit-cornice {
+  overflow: visible;
+  font-size: 14px;
+}
+
+.kit-radice.kit-fuori .kit-alto {
+  top: auto;
+  bottom: 100%;
+  padding: 0.4em 0;
+  background: none;
+}
+
+.kit-radice.kit-fuori .kit-basso {
+  top: 100%;
+  bottom: auto;
+  align-items: flex-start;
+  padding: 0.4em 0;
+}
+
+.kit-radice.kit-fuori .kit-fumetto {
+  max-width: none;
+}
+
+.kit-radice.kit-fuori .kit-velo-carta {
+  position: fixed;
+}
+
+.kit-radice.kit-fuori .kit-avviso {
+  top: 0.5em;
+}
+
+/* La sagoma del telefono (menu della demo): 844×390 con la cornice. */
+.kit-radice.kit-telefono .kit-cornice {
+  outline: 10px solid #000;
+  border-radius: 6px;
+  box-shadow: 0 0 0 12px #2a2a2a, 0 20px 60px #000;
+}
+
+.kit-cornice {
+  position: relative;
+  overflow: hidden;
+  /* --k = pixel dello schermo per pixel della scena; le barre crescono con lui, entro limiti leggibili */
+  --kit-font: clamp(12px, calc(var(--k, 3) * 4.4px), 19px);
+  font-size: var(--kit-font);
+}
+
+.kit-scena {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 320px;
+  height: 180px;
+  transform-origin: 0 0;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.kit-tela {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 320px;
+  height: 180px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Dopo la soluzione la scena non risponde più. */
+.kit-blocco {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  cursor: default;
+}
+
+.kit-blocco[hidden] {
+  display: none;
+}
+
+/* ── Barra in alto ── */
+.kit-alto {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.3em 0.5em;
+  background: linear-gradient(rgb(3 1 4 / 0.85), rgb(3 1 4 / 0));
+  z-index: 10;
+  pointer-events: none;
+}
+
+.kit-alto > * {
+  pointer-events: auto;
+}
+
+.kit-titolo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-right: auto;
+  line-height: 1.1;
+  text-shadow: 2px 2px 0 var(--kit-bordo);
+}
+
+.kit-titolo strong {
+  overflow: hidden;
+  font-size: 1em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.kit-titolo span {
+  font-size: 0.75em;
+  font-weight: 700;
+  color: var(--kit-arancio-chiaro);
+}
+
+.kit-dorate {
+  display: flex;
+  align-items: center;
+  gap: 0.15em;
+}
+
+.kit-icona-caramella {
+  --scala-icona: 1;
+  width: calc(24px * var(--scala-icona) * var(--k-icona, 1));
+  height: calc(12px * var(--scala-icona) * var(--k-icona, 1));
+  image-rendering: pixelated;
+}
+
+.kit-alto .kit-icona-caramella {
+  --k-icona: clamp(1, calc(var(--k, 3) / 2), 2);
+  width: calc(1.9em);
+  height: calc(0.95em);
+}
+
+.kit-icona-caramella.spenta {
+  opacity: 0.55;
+}
+
+/* ── Bottoni (come quelli della fuga di Zucco) ── */
+.kit-btn {
+  min-height: 2em;
+  padding: 0.25em 0.7em;
+  font: inherit;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--kit-bordo);
+  cursor: pointer;
+  background: var(--kit-testo);
+  border: 3px solid var(--kit-bordo);
+  box-shadow: inset -2px -2px 0 #c9b866;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+
+.kit-btn:active {
+  box-shadow: inset 2px 2px 0 #c9b866;
+}
+
+.kit-btn:focus-visible {
+  outline: 3px solid var(--kit-testo);
+  outline-offset: 2px;
+}
+
+.kit-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.kit-btn-forte {
+  color: var(--kit-bordo);
+  text-transform: uppercase;
+  background: var(--kit-arancio);
+  box-shadow: inset -3px -3px 0 var(--kit-arancio-scuro), inset 3px 3px 0 var(--kit-arancio-chiaro);
+}
+
+.kit-btn-forte:active {
+  box-shadow: inset 3px 3px 0 var(--kit-arancio-scuro);
+}
+
+.kit-btn-icona {
+  min-width: 2em;
+  padding: 0.25em 0.4em;
+}
+
+.kit-btn[hidden] {
+  display: none;
+}
+
+/* ── Barra in basso: fumetto a sinistra, bottoni del rompicapo a destra ── */
+.kit-basso {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5em;
+  padding: 0.35em 0.5em;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.kit-basso > * {
+  pointer-events: auto;
+}
+
+.kit-fumetto {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 62%;
+  padding: 0.3em 0.6em;
+  font-size: 0.85em;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--kit-testo);
+  background: rgb(46 27 82 / 0.92);
+  border: 3px solid var(--kit-bordo);
+}
+
+.kit-fumetto[hidden] {
+  display: none;
+}
+
+.kit-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35em;
+  margin-left: auto;
+}
+
+/* ── Avviso degli errori ── */
+.kit-avviso {
+  position: absolute;
+  left: 50%;
+  top: 2.6em;
+  z-index: 30;
+  max-width: 80%;
+  padding: 0.35em 0.8em;
+  font-weight: 700;
+  text-align: center;
+  transform: translateX(-50%);
+  border: 3px solid var(--kit-bordo);
+}
+
+.kit-avviso[hidden] {
+  display: none;
+}
+
+.kit-avviso-errore {
+  color: #fff;
+  background: var(--kit-rosso);
+}
+
+.kit-avviso-info {
+  color: var(--kit-bordo);
+  background: var(--kit-testo);
+}
+
+.kit-scossa {
+  animation: kit-scossa 0.24s steps(6);
+}
+
+@keyframes kit-scossa {
+  0%, 100% { translate: 0 0; }
+  20% { translate: -4px 0; }
+  40% { translate: 4px 0; }
+  60% { translate: -3px 0; }
+  80% { translate: 2px 0; }
+}
+
+/* ── Carte: testo del rompicapo, indizi, vittoria ── */
+.kit-velo-carta {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 0.6em;
+  background: rgb(3 1 4 / 0.6);
+}
+
+.kit-velo-carta[hidden] {
+  display: none;
+}
+
+.kit-carta {
+  box-sizing: border-box;
+  width: min(34em, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 0.9em 1.2em;
+  line-height: 1.35;
+  background: var(--kit-carta);
+  border: 3px solid var(--kit-bordo);
+  box-shadow: inset 0 0 0 2px var(--kit-viola-chiaro), 0 6px 0 #000;
+}
+
+.kit-carta h2 {
+  margin: 0 0 0.4em;
+  font-size: 1.35em;
+  color: var(--kit-arancio);
+  text-shadow: 2px 2px 0 var(--kit-bordo);
+}
+
+.kit-carta p {
+  margin: 0 0 0.55em;
+}
+
+.kit-sopratitolo {
+  margin: 0 0 0.15em !important;
+  font-size: 0.75em;
+  font-weight: 700;
+  color: var(--kit-arancio-chiaro);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kit-riga-btn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  justify-content: flex-end;
+  margin-top: 0.7em;
+}
+
+.kit-indizi {
+  margin: 0 0 0.6em;
+  padding-left: 1.4em;
+}
+
+.kit-indizi li {
+  margin-bottom: 0.35em;
+}
+
+.kit-borsa {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  font-weight: 700;
+}
+
+.kit-borsa .kit-icona-caramella {
+  width: 1.9em;
+  height: 0.95em;
+}
+
+.kit-vincita {
+  display: flex;
+  justify-content: center;
+  gap: 0.5em;
+  margin: 0.4em 0 0.6em;
+}
+
+.kit-vincita .kit-icona-caramella {
+  width: 4em;
+  height: 2em;
+}
+
+.kit-entra {
+  animation: kit-entra 0.45s steps(5) both;
+}
+
+@keyframes kit-entra {
+  0% { opacity: 0; translate: 0 0.8em; scale: 0.4; }
+  60% { opacity: 1; translate: 0 -0.25em; scale: 1.15; }
+  100% { opacity: 1; translate: 0 0; scale: 1; }
+}
+
+/* ── Menu della demo ── */
+.kit-menu {
+  position: absolute;
+  top: 2.6em;
+  right: 0.5em;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  padding: 0.6em;
+  background: var(--kit-carta);
+  border: 3px solid var(--kit-bordo);
+  box-shadow: inset 0 0 0 2px var(--kit-viola-chiaro);
+}
+
+.kit-menu[hidden] {
+  display: none;
+}
+
+/* ── Telefono in verticale ── */
+.kit-gira {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--kit-viola);
+  border: 3px solid var(--kit-bordo);
+}
+
+.kit-gira p {
+  margin: 0;
+}
+
+.kit-gira[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kit-scossa,
+  .kit-entra {
+    animation: none;
+  }
+}
