@@ -186,9 +186,15 @@ Regole di composizione, valide per tutte le stanze:
 
 Nella pagina del catalogo, sotto un rompicapo lo sfondo ha un velo scuro leggero e si aggancia al 30% dall'alto: sugli schermi larghi così restano visibili sia il cartello sia il prato.
 
+## Esplora le sale
+
+In [`esplora/`](esplora/) c'è la bozza giocabile del giro, la stessa della linguetta «Esplora» del [catalogo](https://claude.ai/artifact/GYz9mKr8rS3vebB1eJhiCx#esplora), staccata per metterla online: online è su **https://escape.getinvolvd.com/esplora/**, e dall'elenco delle demo c'è il link. Il codice (`esplora.js`) è quello del catalogo; i dati che lì vengono dall'archivio stanno in `dati/` (geometria, animazioni e portone in `pianta.json`, le chiavi in `oggetti.json`, i nomi delle sale in `stanze.json`) e le immagini in `img/`, con il nome dell'asset del catalogo. Le chiavi prese restano su questo dispositivo invece che sul profilo. Legge i dati con `fetch`, quindi in locale va aperta da un server (per esempio `npx serve` dalla cartella `escape-room`), non con un doppio clic.
+
+Se nel catalogo cambiano la mappa o il codice di Esplora, questa copia non si aggiorna da sola: va rifatta dal catalogo.
+
 ## Pubblicazione
 
-Provvisoriamente le demo stanno su **https://escape.getinvolvd.com**, come [La fuga di Zucco](../zucco/README.md#pubblicazione): un container di file statici sul server di ELEFIX, con l'etichetta di Caddy. Il tunnel manda già `*.getinvolvd.com` a Caddy, quindi su Cloudflare non serve fare nulla. Finché il container non gira, quell'indirizzo mostra ELEFIX. Nel container `demo/` è la radice del sito e gli sfondi stanno in `/sfondi`; `REGOLE_COMUNI.md`, gli `ISTRUZIONI.md` e i `verifica.mjs` non servono a giocare e non vengono pubblicati.
+Provvisoriamente le demo stanno su **https://escape.getinvolvd.com**, come [La fuga di Zucco](../zucco/README.md#pubblicazione): un container di file statici sul server di ELEFIX, con l'etichetta di Caddy. Il tunnel manda già `*.getinvolvd.com` a Caddy, quindi su Cloudflare non serve fare nulla. Finché il container non gira, quell'indirizzo mostra ELEFIX. Nel container `demo/` è la radice del sito, gli sfondi stanno in `/sfondi` e la bozza del giro delle sale in `/esplora` (vedi «Esplora le sale» più sotto); `REGOLE_COMUNI.md`, gli `ISTRUZIONI.md` e i `verifica.mjs` non servono a giocare e non vengono pubblicati.
 
 Sul server, dove c'è già il clone di Zucco:
 
