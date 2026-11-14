@@ -185,3 +185,21 @@ Regole di composizione, valide per tutte le stanze:
 - scritte e colori forti (cartelli, finestre accese, lanterne) lontano dalla zona dove il rompicapo mette i suoi pezzi: nell'Ingresso il cartello sta sul tetto e le lanterne vicino alla cancellata, perché fra i piatti della bilancia sembravano zucche.
 
 Nella pagina del catalogo, sotto un rompicapo lo sfondo ha un velo scuro leggero e si aggancia al 30% dall'alto: sugli schermi larghi così restano visibili sia il cartello sia il prato.
+
+## Pubblicazione
+
+Provvisoriamente le demo stanno su **https://escape.getinvolvd.com**, come [La fuga di Zucco](../zucco/README.md#pubblicazione): un container di file statici sul server di ELEFIX, con l'etichetta di Caddy. Il tunnel manda già `*.getinvolvd.com` a Caddy, quindi su Cloudflare non serve fare nulla. Finché il container non gira, quell'indirizzo mostra ELEFIX. Nel container `demo/` è la radice del sito e gli sfondi stanno in `/sfondi`; `REGOLE_COMUNI.md`, gli `ISTRUZIONI.md` e i `verifica.mjs` non servono a giocare e non vengono pubblicati.
+
+Sul server, dove c'è già il clone di Zucco:
+
+```sh
+cd /opt/halloween-2027
+git fetch && git checkout feat/escape-online && git pull   # dopo il merge: main
+cd 14_Giochi_e_Community/giochi/escape-room
+docker compose up -d --build
+docker compose ps
+```
+
+Aggiornamento: `git pull` e di nuovo `docker compose up -d --build`. Per toglierlo: `docker compose down`.
+
+**Cache.** Come per Zucco, Cloudflare fa tenere al browser `.js` e `.css` per 4 ore. Il `Dockerfile` aggiunge `?v=<impronta>` a ogni script e stile delle pagine (l'md5 di tutti i file): ogni versione ha indirizzi nuovi, e le pagine non vanno mai in cache.

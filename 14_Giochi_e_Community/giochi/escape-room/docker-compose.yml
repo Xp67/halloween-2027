@@ -1,0 +1,22 @@
+# Le demo dell'escape room su https://escape.getinvolvd.com, come La fuga di Zucco.
+# Provvisorio: si appoggia a Caddy di ELEFIX come un'istanza, finché il sito GetInvolved non è online.
+# Il tunnel manda già *.getinvolvd.com a Caddy, che legge l'etichetta: su Cloudflare non serve fare nulla.
+name: escape-room
+
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    networks:
+      - elefix_proxy
+    labels:
+      caddy: http://escape.getinvolvd.com
+      caddy.reverse_proxy: "{{upstreams 80}}"
+    deploy:
+      resources:
+        limits:
+          memory: 32m
+
+networks:
+  elefix_proxy:
+    external: true
